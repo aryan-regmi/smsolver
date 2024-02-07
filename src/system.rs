@@ -108,13 +108,24 @@ impl System {
 
         let r = |x: f32, y: f32| (x.powi(2) + y.powi(2)).sqrt();
 
-        for node in &self.nodes {
-            let x = node.position.x.get().0;
-            let y = node.position.y.get().0;
-            let theta = (y).atan2(x);
-            let r1 = r(x, y);
+        for element in &self.elements {
+            let n1 = element.0;
+            let n2 = element.1;
+
+            let x1 = n1.position.x.get().0;
+            let x2 = n2.position.x.get().0;
+            let y1 = n1.position.y.get().0;
+            let y2 = n2.position.y.get().0;
+
+            let theta = (y2 - y1).atan2(x2 - x1);
+
+            let r1 = r(x1, y1);
             moment_coeffs.push(r1 * theta.sin());
             moment_coeffs.push(r1 * theta.cos());
+
+            let r2 = r(x2, y2);
+            moment_coeffs.push(r2 * theta.sin());
+            moment_coeffs.push(r2 * theta.cos());
         }
 
         for force in &self.forces {
