@@ -102,11 +102,20 @@ impl System {
     }
 
     /// Sums the moments about the origin (0,0).
-    fn sum_moments(&self) -> Vec<f32> {
+    fn sum_moments(&self) -> Result<Vec<f32>, String> {
         let num_unknowns = self.nodes.len() + self.forces.len();
         let mut moment_coeffs: Vec<f32> = Vec::with_capacity(2 * num_unknowns);
 
         let r = |x: f32, y: f32| (x.powi(2) + y.powi(2)).sqrt();
+
+        let theta = |n1: Node, n2: Node| {
+            let x1 = n1.position.x.get().0;
+            let x2 = n2.position.x.get().0;
+            let y1 = n1.position.y.get().0;
+            let y2 = n2.position.y.get().0;
+
+            (y2 - y1).atan2(x2 - x1)
+        };
 
         for element in &self.elements {
             let n1 = element.0;
@@ -117,27 +126,64 @@ impl System {
             let y1 = n1.position.y.get().0;
             let y2 = n2.position.y.get().0;
 
-            let theta = (y2 - y1).atan2(x2 - x1);
-
             let r1 = r(x1, y1);
-            moment_coeffs.push(r1 * theta.sin());
-            moment_coeffs.push(r1 * theta.cos());
+            moment_coeffs.push(r1 * theta(n1, n2).sin());
+            moment_coeffs.push(r1 * theta(n1, n2).cos());
 
             let r2 = r(x2, y2);
-            moment_coeffs.push(r2 * theta.sin());
-            moment_coeffs.push(r2 * theta.cos());
+            moment_coeffs.push(r2 * theta(n1, n2).sin());
+            moment_coeffs.push(r2 * theta(n1, n2).cos());
         }
 
         for force in &self.forces {
+            let idx = self.get_force_elem(force)?;
+            let element = self.elements[idx];
+            let n1 = element.0;
+            let n2 = element.1;
+
             let x = force.position.x.get().0;
             let y = force.position.y.get().0;
-            let theta = (y).atan2(x);
             let rf = r(x, y);
-            moment_coeffs.push(rf * theta.sin());
-            moment_coeffs.push(rf * theta.cos());
+
+            moment_coeffs.push(rf * theta(n1, n2).sin());
+            moment_coeffs.push(rf * theta(n1, n2).cos());
         }
 
-        moment_coeffs
+        Ok(moment_coeffs)
+    }
+
+    /// Gets the element that a force is action on.
+    fn get_force_elem(&self, f: &Force) -> Result<usize, String> {
+        let mut expected_y_pos = 0.0;
+        let mut expected_elem_idx = 0;
+        for (i, element) in self.elements.iter().enumerate() {
+            let n1 = element.0;
+            let n2 = element.1;
+
+            let x1 = n1.position.x.get().0;
+            let x2 = n2.position.x.get().0;
+            let y1 = n1.position.y.get().0;
+            let y2 = n2.position.y.get().0;
+
+            let f_xpos = f.position.x.get().0;
+            let f_ypos = f.position.y.get().0;
+
+            let slope = (y2 - y1) / (x2 - x1);
+            let intercept = y2 - (slope * x2);
+
+            let y_expected = (slope * f_xpos) + intercept;
+            expected_y_pos = y_expected;
+            expected_elem_idx = i;
+
+            if y_expected == f_ypos {
+                return Ok(i);
+            }
+        }
+
+        Err(format!(
+            "Unable to determine the element that the force acts on: Update the y-position of the force to `{}` so that it acts on the element at index {:?}",
+            expected_y_pos, expected_elem_idx
+        ))
     }
 }
 
@@ -148,7 +194,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn can_create_system() {
+    fn can_create_system() -> Result<(), String> {
         let l = Meter(4.0);
         let n1 = Node::support(Support::Pin, 0.0, 0.0);
         let n2 = Node::support(Support::Roller, l.0, 0.0);
@@ -169,6 +215,8 @@ mod tests {
 
         dbg!(system.sum_forces_x());
         dbg!(system.sum_forces_y());
-        dbg!(system.sum_moments());
+        dbg!(system.sum_moments()?);
+
+        Ok(())
     }
 }
