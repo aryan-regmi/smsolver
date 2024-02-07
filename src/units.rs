@@ -12,7 +12,7 @@ pub mod angle {
     use super::Unit;
     use std::ops::{Add, Div, Mul, Sub};
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     pub struct Degree(pub f32);
     impl Unit for Degree {}
     impl From<f32> for Degree {
@@ -48,8 +48,13 @@ pub mod angle {
             Self(self.0 - rhs)
         }
     }
+    impl Degree {
+        pub fn radians(&self) -> Radian {
+            Radian(self.0.to_radians())
+        }
+    }
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     pub struct Radian(pub f32);
     impl Unit for Radian {}
     impl From<f32> for Radian {
@@ -85,8 +90,13 @@ pub mod angle {
             Self(self.0 - rhs)
         }
     }
+    impl Radian {
+        pub fn degrees(&self) -> Degree {
+            Degree(self.0.to_degrees())
+        }
+    }
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     pub struct Angle<U: Unit = Degree> {
         value: U,
     }
@@ -110,13 +120,19 @@ pub mod angle {
             }
         }
     }
+
+    impl<U: Unit> Angle<U> {
+        pub fn get(&self) -> U {
+            self.value
+        }
+    }
 }
 
 pub mod length {
     use super::Unit;
     use std::ops::{Add, Div, Mul, Sub};
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     pub struct Meter(pub f32);
     impl Unit for Meter {}
     impl From<f32> for Meter {
@@ -153,7 +169,7 @@ pub mod length {
         }
     }
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     pub struct Kilometer(pub f32);
     impl Unit for Kilometer {}
     impl From<f32> for Kilometer {
@@ -190,7 +206,7 @@ pub mod length {
         }
     }
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     pub struct Length<U: Unit = Meter> {
         value: U,
     }
@@ -212,6 +228,12 @@ pub mod length {
             Self {
                 value: value.into(),
             }
+        }
+    }
+
+    impl<U: Unit> Length<U> {
+        pub fn get(&self) -> U {
+            self.value
         }
     }
 }
@@ -318,13 +340,19 @@ pub mod force {
             }
         }
     }
+
+    impl<U: Unit> Force<U> {
+        pub fn get(&self) -> U {
+            self.value
+        }
+    }
 }
 
 pub mod moment {
     use super::Unit;
     use std::ops::{Add, Div, Mul, Sub};
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     pub struct NewtonMeter(pub f32);
     impl Unit for NewtonMeter {}
     impl From<f32> for NewtonMeter {
@@ -361,7 +389,7 @@ pub mod moment {
         }
     }
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     pub struct PoundFoot(pub f32);
     impl Unit for PoundFoot {}
     impl From<f32> for PoundFoot {
@@ -398,7 +426,7 @@ pub mod moment {
         }
     }
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     pub struct Moment<U: Unit = NewtonMeter> {
         value: U,
     }
@@ -420,6 +448,12 @@ pub mod moment {
             Self {
                 value: value.into(),
             }
+        }
+    }
+
+    impl<U: Unit> Moment<U> {
+        pub fn get(&self) -> U {
+            self.value
         }
     }
 }
