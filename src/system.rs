@@ -51,7 +51,7 @@ impl Node {
 ///
 /// This consists of two nodes (that it exists between) and an angle from the X-axis.
 #[derive(Debug, Clone, Copy)]
-struct Element(Node, Node, Angle);
+struct Element(Node, Node);
 
 /// A force at `position` that acts in the `unit_vector` direction.
 #[derive(Debug, Clone, Copy)]
@@ -110,21 +110,30 @@ impl System {
 
         let mut node_used = vec![];
         for element in &self.elements {
-            let theta = element.2.get();
-
             let n1 = element.0;
+            let n2 = element.1;
+
+            let theta = {
+                let x1 = n1.position.x.get().0;
+                let x2 = n2.position.x.get().0;
+                let y1 = n1.position.y.get().0;
+                let y2 = n2.position.y.get().0;
+                (y2 - y1).atan2(x2 - x1)
+            };
+
+            // let theta = element.2.get();
+
             if !node_used.contains(&n1) {
                 let r1 = r(n1.position.x.get().0, n1.position.y.get().0);
-                moment_coeffs.push(r1 * theta.radians().0.sin());
-                moment_coeffs.push(r1 * theta.radians().0.cos());
+                moment_coeffs.push(r1 * theta.sin());
+                moment_coeffs.push(r1 * theta.cos());
                 node_used.push(n1);
             }
 
-            let n2 = element.1;
             if !node_used.contains(&n2) {
                 let r2 = r(n2.position.x.get().0, n2.position.y.get().0);
-                moment_coeffs.push(r2 * theta.radians().0.sin());
-                moment_coeffs.push(r2 * theta.radians().0.cos());
+                moment_coeffs.push(r2 * theta.sin());
+                moment_coeffs.push(r2 * theta.cos());
                 node_used.push(n2);
             }
         }
@@ -140,6 +149,10 @@ impl System {
 
         moment_coeffs
     }
+
+    fn a_matrix(&self) -> Vec<f32> {
+        todo!("Create the `A` matrix in `Ax = b` by combining sum forces and moments")
+    }
 }
 
 #[cfg(test)]
@@ -153,7 +166,7 @@ mod tests {
         let l = Meter(4.0);
         let n1 = Node::support(Support::Pin, 0.0, 0.0);
         let n2 = Node::support(Support::Roller, l.0, 0.0);
-        let e1 = Element(n1, n2, Degree(0.0).into());
+        let e1 = Element(n1, n2);
         let p = Force {
             position: Position2d {
                 x: (l / 2.0).into(),
