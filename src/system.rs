@@ -51,7 +51,7 @@ impl Node {
 ///
 /// This consists of two nodes (that it exists between) and an angle from the X-axis.
 #[derive(Debug, Clone, Copy)]
-struct Element(Node, Node, Angle);
+struct Element(Node, Node);
 
 /// A force at `position` that acts in the `unit_vector` direction.
 #[derive(Debug, Clone, Copy)]
@@ -108,25 +108,13 @@ impl System {
 
         let r = |x: f32, y: f32| (x.powi(2) + y.powi(2)).sqrt();
 
-        let mut node_used = vec![];
-        for element in &self.elements {
-            let theta = element.2.get();
-
-            let n1 = element.0;
-            if !node_used.contains(&n1) {
-                let r1 = r(n1.position.x.get().0, n1.position.y.get().0);
-                moment_coeffs.push(r1 * theta.radians().0.sin());
-                moment_coeffs.push(r1 * theta.radians().0.cos());
-                node_used.push(n1);
-            }
-
-            let n2 = element.1;
-            if !node_used.contains(&n2) {
-                let r2 = r(n2.position.x.get().0, n2.position.y.get().0);
-                moment_coeffs.push(r2 * theta.radians().0.sin());
-                moment_coeffs.push(r2 * theta.radians().0.cos());
-                node_used.push(n2);
-            }
+        for node in &self.nodes {
+            let x = node.position.x.get().0;
+            let y = node.position.y.get().0;
+            let theta = (y).atan2(x);
+            let r1 = r(x, y);
+            moment_coeffs.push(r1 * theta.sin());
+            moment_coeffs.push(r1 * theta.cos());
         }
 
         for force in &self.forces {
@@ -144,7 +132,7 @@ impl System {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Degree, Meter};
+    use crate::Meter;
 
     use super::*;
 
@@ -153,7 +141,7 @@ mod tests {
         let l = Meter(4.0);
         let n1 = Node::support(Support::Pin, 0.0, 0.0);
         let n2 = Node::support(Support::Roller, l.0, 0.0);
-        let e1 = Element(n1, n2, Degree(0.0).into());
+        let e1 = Element(n1, n2);
         let p = Force {
             position: Position2d {
                 x: (l / 2.0).into(),
