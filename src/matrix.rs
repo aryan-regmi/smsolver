@@ -1,7 +1,9 @@
 use core::fmt;
 use std::{
+    fmt::Write,
     mem,
-    ptr::{null_mut, NonNull},
+    ops::{Index, IndexMut},
+    ptr::NonNull,
 };
 use thiserror::Error;
 
@@ -20,11 +22,37 @@ struct Row<'a, const N: usize>([&'a f32; N]);
 
 impl<'a, const N: usize> fmt::Debug for Row<'a, N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[")?;
-        for val in self.0 {
-            write!(f, " {} ", val)?;
+        f.debug_list().entries(self.0.iter()).finish()
+    }
+}
+
+impl<'a, const N: usize> Index<usize> for Row<'a, N> {
+    type Output = f32;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        if index >= N {
+            panic!(
+                "RowIndexOutOfBounds: The index {:?} is out of bounds; it must 
+                be less than {}.",
+                index, N,
+            );
         }
-        write!(f, "]")
+
+        self.0[index]
+    }
+}
+
+impl<'a, const N: usize> IndexMut<usize> for Row<'a, N> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        if index >= N {
+            panic!(
+                "RowIndexOutOfBounds: The index {:?} is out of bounds; it must 
+                be less than {}.",
+                index, N,
+            );
+        }
+        let val = self.0[index] as *const f32;
+        unsafe { (val as *mut f32).as_mut().unwrap() }
     }
 }
 
@@ -41,31 +69,32 @@ impl<'a, const M: usize> fmt::Debug for Col<'a, M> {
     }
 }
 
-struct MutRow<const N: usize>([*mut f32; N]);
+impl<'a, const M: usize> Index<usize> for Col<'a, M> {
+    type Output = f32;
 
-impl<const N: usize> fmt::Debug for MutRow<N> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[")?;
-        for val in &self.0 {
-            unsafe {
-                write!(f, " {} ", val.as_ref().unwrap())?;
-            }
+    fn index(&self, index: usize) -> &Self::Output {
+        if index >= M {
+            panic!(
+                "RowIndexOutOfBounds: The index {:?} is out of bounds; it must 
+                be less than {}.",
+                index, M,
+            );
         }
-        write!(f, "]")
+        self.0[index]
     }
 }
 
-struct MutCol<const M: usize>([*mut f32; M]);
-
-impl<const M: usize> fmt::Debug for MutCol<M> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[")?;
-        for val in &self.0 {
-            unsafe {
-                write!(f, " {} ", val.as_ref().unwrap())?;
-            }
+impl<'a, const M: usize> IndexMut<usize> for Col<'a, M> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        if index >= M {
+            panic!(
+                "RowIndexOutOfBounds: The index {:?} is out of bounds; it must 
+                be less than {}.",
+                index, M,
+            );
         }
-        write!(f, "]")
+        let val = self.0[index] as *const f32;
+        unsafe { (val as *mut f32).as_mut().unwrap() }
     }
 }
 
@@ -164,41 +193,6 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
 
         Col(col)
     }
-
-    fn row_mut<'a>(&self, idx: usize) -> MutRow<N> {
-        if idx >= M {
-            panic!(
-                "RowIndexOutOfBounds: The index {} is out of bounds. It must be less than {}",
-                idx, M
-            );
-        }
-        let mut row: [*mut f32; N] = [null_mut(); N];
-
-        let data = self.data.as_ptr();
-        for i in 0..N {
-            row[i] = unsafe { data.add(self.get_index(idx, i)).as_mut().unwrap() };
-        }
-
-        MutRow(row)
-    }
-
-    fn col_mut(&self, idx: usize) -> MutCol<M> {
-        if idx >= N {
-            panic!(
-                "ColumnIndexOutOfBounds: The index {} is out of bounds. It must
-                be less than {}",
-                idx, N
-            );
-        }
-        let mut col: [*mut f32; M] = [null_mut(); M];
-
-        let data = self.data.as_ptr();
-        for i in 0..M {
-            col[i] = unsafe { data.add(self.get_index(i, idx)).as_mut().unwrap() };
-        }
-
-        MutCol(col)
-    }
 }
 
 impl<const M: usize, const N: usize> Drop for Matrix<M, N> {
@@ -211,11 +205,15 @@ impl<const M: usize, const N: usize> Drop for Matrix<M, N> {
 
 impl<const M: usize, const N: usize> fmt::Debug for Matrix<M, N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Matrix<{}, {}> [\n", M, N)?;
+        // write!(f, "Matrix<{}> [\n", format_args!("{}, {}", M, N))?;
+        // write!(f, "{}", format_args!("Matrix<{}, {}> [\n", M, N))?;
+        f.write_fmt(format_args!("Matrix<{}, {}> [\n", M, N))?;
         for i in 0..M {
-            write!(f, "\t{:?}\n", self.row(i))?;
+            f.write_fmt(format_args!("\t{:?}\n", self.row(i)))?;
+            // write!(f, "{}", format_args!("\t{:?}\n", self.row(i)))?;
         }
-        write!(f, "]")
+        write!(f, "{}", format_args!("]"))
+        // f.debug_list()
     }
 }
 
@@ -226,7 +224,7 @@ mod tests {
     #[test]
     fn can_init() {
         let mat = Matrix::<3, 2>::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
-        dbg!(mat);
+        dbg!(&mat);
     }
 
     #[test]
@@ -241,5 +239,11 @@ mod tests {
                 assert_eq!(*mat.index(row, col), vec[mat.get_index(row, col)])
             }
         }
+
+        let row0 = mat.row(0);
+        assert_eq!(row0[0], vec[0]);
+
+        let col0 = mat.col(0);
+        assert_eq!(col0[1], vec[3]);
     }
 }
