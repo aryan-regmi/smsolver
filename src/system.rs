@@ -1,4 +1,7 @@
-use crate::units::{self, Angle};
+use crate::units;
+
+// TODO: Create new type for matrix: Matrix<Dimension>
+type Matrix = Vec<Vec<f32>>;
 
 /// A position in 2D.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -22,7 +25,7 @@ struct Node {
     /// Direction of forces at the node.
     ///
     /// This is used to apply boundary constraints.
-    force_unit_vectors: [f32; 2],
+    reaction_components: [f32; 2],
 }
 
 impl Node {
@@ -36,12 +39,12 @@ impl Node {
         match kind {
             Support::Pin => Self {
                 position,
-                force_unit_vectors: [1.0, 1.0],
+                reaction_components: [1.0, 1.0],
             },
 
             Support::Roller => Self {
                 position,
-                force_unit_vectors: [0.0, 1.0],
+                reaction_components: [0.0, 1.0],
             },
         }
     }
@@ -57,8 +60,10 @@ struct Element(Node, Node);
 #[derive(Debug, Clone, Copy)]
 struct Force {
     position: Position2d,
-    unit_vector: [f32; 2],
+    components: [f32; 2],
 }
+
+const NUM_EQNS: usize = 3;
 
 /// The system to solve.
 #[derive(Debug, Clone)]
@@ -71,15 +76,14 @@ struct System {
 impl System {
     /// Sums the forces in the direction of the X-axis.
     fn sum_forces_x(&self) -> Vec<f32> {
-        let num_unknowns = self.nodes.len() + self.forces.len();
-        let mut fx_coeffs = Vec::with_capacity(num_unknowns);
-
-        for node in &self.nodes {
-            fx_coeffs.push(node.force_unit_vectors[0]);
+        let size = 2 * self.nodes.len();
+        let mut fx_coeffs = Vec::with_capacity(size);
+        for _ in 0..size {
+            fx_coeffs.push(0.0)
         }
 
-        for force in &self.forces {
-            fx_coeffs.push(force.unit_vector[0]);
+        for (i, node) in self.nodes.iter().enumerate() {
+            fx_coeffs[i * 2] = node.reaction_components[0];
         }
 
         fx_coeffs
@@ -87,26 +91,38 @@ impl System {
 
     /// Sums the forces in the direction of the Y-axis.
     fn sum_forces_y(&self) -> Vec<f32> {
-        let num_unknowns = self.nodes.len() + self.forces.len();
-        let mut fy_coeffs = Vec::with_capacity(num_unknowns);
-
-        for node in &self.nodes {
-            fy_coeffs.push(node.force_unit_vectors[1]);
+        let size = 2 * self.nodes.len();
+        let mut fy_coeffs = Vec::with_capacity(size);
+        for _ in 0..size {
+            fy_coeffs.push(0.0)
         }
 
-        for force in &self.forces {
-            fy_coeffs.push(force.unit_vector[1]);
+        for (i, node) in self.nodes.iter().enumerate() {
+            fy_coeffs[(i * 2) + 1] = node.reaction_components[1];
         }
 
         fy_coeffs
     }
 
-    /// Sums the moments about the origin (0,0).
-    fn sum_moments(&self) -> Result<Vec<f32>, String> {
-        let num_unknowns = self.nodes.len() + self.forces.len();
-        let mut moment_coeffs: Vec<f32> = Vec::with_capacity(2 * num_unknowns);
+    fn distance(x: f32, y: f32) -> f32 {
+        (x.powi(2) + y.powi(2)).sqrt()
+    }
 
-        let r = |x: f32, y: f32| (x.powi(2) + y.powi(2)).sqrt();
+    fn direction(x1: f32, y1: f32, x2: f32, y2: f32) -> f32 {
+        (y2 - y1).atan2(x2 - x1)
+    }
+
+    /// Sums the moments about the origin (0,0).
+    fn sum_moments(&self) -> Vec<f32> {
+        let size = 2 * self.nodes.len();
+        let mut moment_coeffs: Vec<f32> = Vec::with_capacity(size);
+
+        let r = |n: Node| {
+            let x = n.position.x.get().0;
+            let y = n.position.y.get().0;
+
+            System::distance(x, y)
+        };
 
         let theta = |n1: Node, n2: Node| {
             let x1 = n1.position.x.get().0;
@@ -114,42 +130,23 @@ impl System {
             let y1 = n1.position.y.get().0;
             let y2 = n2.position.y.get().0;
 
-            (y2 - y1).atan2(x2 - x1)
+            System::direction(x1, y1, x2, y2)
         };
 
         for element in &self.elements {
             let n1 = element.0;
             let n2 = element.1;
 
-            let x1 = n1.position.x.get().0;
-            let x2 = n2.position.x.get().0;
-            let y1 = n1.position.y.get().0;
-            let y2 = n2.position.y.get().0;
-
-            let r1 = r(x1, y1);
+            let r1 = r(n1);
             moment_coeffs.push(r1 * theta(n1, n2).sin());
             moment_coeffs.push(r1 * theta(n1, n2).cos());
 
-            let r2 = r(x2, y2);
+            let r2 = r(n2);
             moment_coeffs.push(r2 * theta(n1, n2).sin());
             moment_coeffs.push(r2 * theta(n1, n2).cos());
         }
 
-        for force in &self.forces {
-            let idx = self.get_force_elem(force)?;
-            let element = self.elements[idx];
-            let n1 = element.0;
-            let n2 = element.1;
-
-            let x = force.position.x.get().0;
-            let y = force.position.y.get().0;
-            let rf = r(x, y);
-
-            moment_coeffs.push(rf * theta(n1, n2).sin());
-            moment_coeffs.push(rf * theta(n1, n2).cos());
-        }
-
-        Ok(moment_coeffs)
+        moment_coeffs
     }
 
     /// Gets the element that a force is action on.
@@ -185,6 +182,88 @@ impl System {
             expected_y_pos, expected_elem_idx
         ))
     }
+
+    /// Combines the sum of forces and moments to create the `A` matrix (Ax = b).
+    fn a_matrix(&self) -> Matrix {
+        let mut a_matrix = Vec::with_capacity(NUM_EQNS);
+
+        let fx_coeffs = self.sum_forces_x();
+        let fy_coeffs = self.sum_forces_y();
+        let moment_coeffs = self.sum_moments();
+
+        a_matrix.push(fx_coeffs);
+        a_matrix.push(fy_coeffs);
+        a_matrix.push(moment_coeffs);
+
+        a_matrix
+    }
+
+    /// Combines the external force coeffs to create the `b` matrix (Ax = b).
+    fn b_matrix(&self) -> Result<Vec<f32>, String> {
+        let mut fx = 0.0;
+        let mut fy = 0.0;
+        let mut moment = 0.0;
+        for force in &self.forces {
+            fx += force.components[0];
+            fy += force.components[1];
+
+            {
+                let idx = self.get_force_elem(force)?;
+                let element = self.elements[idx];
+                let n1 = element.0;
+                let n2 = element.1;
+
+                let x = force.position.x.get().0;
+                let y = force.position.y.get().0;
+
+                let rf = System::distance(x, y);
+                let theta = |n1: Node, n2: Node| {
+                    let x1 = n1.position.x.get().0;
+                    let x2 = n2.position.x.get().0;
+                    let y1 = n1.position.y.get().0;
+                    let y2 = n2.position.y.get().0;
+
+                    System::direction(x1, y1, x2, y2)
+                };
+
+                moment += rf * theta(n1, n2).sin();
+                moment += rf * theta(n1, n2).cos();
+            }
+        }
+
+        Ok(vec![fx, fy, moment])
+    }
+
+    // TODO: Move to matrix
+    //
+    /// Calculates the QR factorization of the matrix using the Householder alogrithm.
+    fn qr_factorization(mat: Matrix) -> (Matrix, Matrix) {
+        todo!()
+    }
+
+    // TODO: Move to matrix & generalize the type (i.e square, rect, triangle, etc)
+    //
+    /// Calculates the inverse of the matrix.
+    fn matrix_inverse(mat: Matrix) -> Matrix {
+        let (q, r) = System::qr_factorization(mat);
+
+        // TODO: inv(mat) = inv(r).mul(q.transpose())
+
+        todo!()
+    }
+
+    /// Solves `Ax = b` for x (x = inverse[A]b).
+    fn solve(&self) -> Result<(), String> {
+        let ncols = 2 * self.nodes.len();
+
+        let a = self.a_matrix();
+        let b = self.b_matrix()?;
+
+        // dbg!(a);
+        // dbg!(b);
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -204,7 +283,7 @@ mod tests {
                 x: (l / 2.0).into(),
                 y: 0.0.into(),
             },
-            unit_vector: [0.0, -1.0],
+            components: [0.0, -1.0],
         };
 
         let system = System {
@@ -213,9 +292,15 @@ mod tests {
             forces: vec![p],
         };
 
-        dbg!(system.sum_forces_x());
-        dbg!(system.sum_forces_y());
-        dbg!(system.sum_moments()?);
+        // dbg!(system.sum_forces_x());
+        // dbg!(system.sum_forces_y());
+        // dbg!(system.sum_moments());
+        // dbg!(system.a_matrix());
+        //
+        system.solve()?;
+
+        // dbg!(system.a_matrix()?);
+        // dbg!(system.b_matrix());
 
         Ok(())
     }
