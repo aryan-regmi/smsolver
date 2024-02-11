@@ -133,16 +133,6 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
         Self { data }
     }
 
-    // TODO: Add `from_slice` and `from_array` functions
-
-    // TODO: Add `from_array_slice` functions (matrix from slice of array i.e `&[[1.0, 2.0],[3.0, 4.0]]`)
-
-    // TODO: Add `default` function (create an empty matrix)
-
-    // TODO: Add `identity`, `ones`, `zeros`, and `linspace` functions for initalizations
-
-    // TODO: Generalize to all numerical types (not just f32)
-
     /// Creates an identity matrix.
     ///
     /// ## Notes
@@ -165,6 +155,40 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
 
         Matrix { data }
     }
+
+    /// Creates a matrix of zeros.
+    fn zeros() -> Matrix<M, N> {
+        let v = vec![0.0;M*N];
+        let data = {
+            let mut v = mem::ManuallyDrop::new(v);
+            let data = v.as_mut_ptr();
+            NonNull::new(data).unwrap()
+        };
+
+        Matrix { data }
+    }
+
+    /// Creates a matrix of ones.
+    fn ones() -> Matrix<M, N> {
+        let v = vec![1.0;M*N];
+
+        let data = {
+            let mut v = mem::ManuallyDrop::new(v);
+            let data = v.as_mut_ptr();
+            NonNull::new(data).unwrap()
+        };
+
+        Matrix { data }
+    }
+
+
+    // TODO: Add `from_slice` and `from_array` functions
+
+    // TODO: Add `from_array_slice` functions (matrix from slice of array i.e `&[[1.0, 2.0],[3.0, 4.0]]`)
+
+    // TODO: Add `default` function (create an empty matrix)
+
+    // TODO: Generalize to all numerical types (not just f32)
 
     /// Converts the matrix to a vector, consuming `self`.
     ///
@@ -333,6 +357,32 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
 
 }
 
+impl<const N: usize> Matrix<1, N> {
+    /// Creates a 1xP matrix with values from `start` to `end` spaced linearly.
+    fn linspace(start: f32, end: f32) -> Self {
+        let h = (end - start)/(N-1) as f32;
+        let mut v = vec![0.0;N];
+        v[0] = start;
+        (1..N).for_each(|i| {
+            v[i] = v[i-1]+ h;
+        });
+
+        let data = {
+            let mut v = mem::ManuallyDrop::new(v);
+            let data = v.as_mut_ptr();
+            NonNull::new(data).unwrap()
+        };
+
+       Self { data }
+    }
+}
+
+impl<const M: usize, const N: usize> Default for Matrix<M, N> {
+    fn default() -> Self {
+        Self::zeros()
+    }
+}
+
 impl<const M: usize, const N: usize> Drop for Matrix<M, N> {
     fn drop(&mut self) {
         unsafe {
@@ -375,10 +425,16 @@ mod tests {
     #[test]
     fn can_init() {
         let _mat = Matrix::<3, 2>::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
-        // dbg!(&mat);
+        // dbg!(mat);
 
         let _eye = Matrix::<6,6>::identity();
-        // dbg!(&eye);
+        // dbg!(eye);
+
+        let _lin: Matrix<1,5> = Matrix::linspace(1.0,10.0);
+        // dbg!(lin);
+
+        let _zeros: Matrix<2,5> = Matrix::default();
+        // dbg!(zeros);
     }
 
     #[test]
