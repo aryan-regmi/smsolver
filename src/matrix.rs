@@ -1,8 +1,6 @@
 use core::{fmt, slice};
 use std::{
-    mem,
-    ops::{Index, IndexMut},
-    ptr::NonNull,
+     mem, ops::{Index, IndexMut}, ptr::NonNull
 };
 
 /// Represents a row from a matrix.
@@ -343,6 +341,14 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
         }
 
         res
+    }
+
+    /// Returns the QR-factorization of the matrix using the Householder method.
+    fn qr_factorization(&self) -> (Matrix<M,M>, Matrix<M,N>) {
+        let mut q = Matrix::<M,N>::identity();
+        let mut r = self.clone();
+
+        todo!()
     }
 
 }
