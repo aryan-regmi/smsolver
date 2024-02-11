@@ -104,6 +104,8 @@ impl<'a, const M: usize> IndexMut<usize> for Col<'a, M> {
 }
 
 // TODO: Impl iterator trait
+//
+/// A `M x N` matrix (with `M` rows and `N` columns).
 struct Matrix<const M: usize, const N: usize> {
     data: NonNull<f32>,
 }
@@ -185,8 +187,6 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
     // TODO: Add `from_slice` and `from_array` functions
 
     // TODO: Add `from_array_slice` functions (matrix from slice of array i.e `&[[1.0, 2.0],[3.0, 4.0]]`)
-
-    // TODO: Add `default` function (create an empty matrix)
 
     // TODO: Generalize to all numerical types (not just f32)
 
@@ -378,12 +378,14 @@ impl<const N: usize> Matrix<1, N> {
 }
 
 impl<const M: usize, const N: usize> Default for Matrix<M, N> {
+    /// Creates a `M x N` matrix filled with zeros.
     fn default() -> Self {
         Self::zeros()
     }
 }
 
 impl<const M: usize, const N: usize> Drop for Matrix<M, N> {
+    /// Releases the memory used by the matrix.
     fn drop(&mut self) {
         unsafe {
             Vec::from_raw_parts(self.data.as_ptr(), M * N, M * N);
@@ -392,6 +394,7 @@ impl<const M: usize, const N: usize> Drop for Matrix<M, N> {
 }
 
 impl<const M: usize, const N: usize> Clone for Matrix<M, N> {
+    /// Clones the matrix into a new one by copying each element.
     fn clone(&self) -> Self {
         let mut data = vec![0.0; M * N];
         for row in 0..M {
@@ -406,15 +409,11 @@ impl<const M: usize, const N: usize> Clone for Matrix<M, N> {
 
 impl<const M: usize, const N: usize> fmt::Debug for Matrix<M, N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // write!(f, "Matrix<{}> [\n", format_args!("{}, {}", M, N))?;
-        // write!(f, "{}", format_args!("Matrix<{}, {}> [\n", M, N))?;
         f.write_fmt(format_args!("Matrix<{}, {}> [\n", M, N))?;
         for i in 0..M {
             f.write_fmt(format_args!("\t{:?}\n", self.row(i)))?;
-            // write!(f, "{}", format_args!("\t{:?}\n", self.row(i)))?;
         }
         write!(f, "{}", format_args!("]"))
-        // f.debug_list()
     }
 }
 
