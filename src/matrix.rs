@@ -4,18 +4,8 @@ use std::{
     ops::{Index, IndexMut},
     ptr::NonNull,
 };
-use thiserror::Error;
 
-#[derive(Debug, Error)]
-enum MatrixError {
-    #[error("The length of the vector must be {0}, but was {1}")]
-    InvalidShape(usize, usize),
-    #[error("The index {0} is out of bounds")]
-    RowIndexOutOfBounds(usize),
-}
-
-type MatrixResult<T> = Result<T, MatrixError>;
-
+/// Represents a row from a matrix.
 #[derive(Clone)]
 struct Row<'a, const N: usize>([&'a f32; N]);
 
@@ -59,12 +49,13 @@ impl<'a, const N: usize> IndexMut<usize> for Row<'a, N> {
     }
 }
 
+/// Represents a column from a matrix.
 #[derive(Clone)]
 struct Col<'a, const M: usize>([&'a f32; M]);
 
 impl<'a, const M: usize> fmt::Debug for Col<'a, M> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[\n")?;
+        writeln!(f, "[n")?;
         for (i, val) in self.0.iter().enumerate() {
             if i != self.0.len() {
                 write!(f, "\t{}\n ", val)?;
@@ -183,7 +174,6 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
         Matrix { data }
     }
 
-
     // TODO: Add `from_slice` and `from_array` functions
 
     // TODO: Add `from_array_slice` functions (matrix from slice of array i.e `&[[1.0, 2.0],[3.0, 4.0]]`)
@@ -250,7 +240,7 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
     ///
     /// ## Panics
     /// Panics if `row` or `col` are greater than `M` and `N` respectively.
-    fn index_mut(&self, row: usize, col: usize) -> &mut f32 {
+    fn index_mut(&mut self, row: usize, col: usize) -> &mut f32 {
         if (row >= M) || (col >= N) {
             panic!(
                 "IndexOutOfBounds: The index {:?} is out of bounds. The row and
@@ -281,9 +271,9 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
         let mut row = [&0.0; N];
 
         let data = self.data.as_ptr();
-        for i in 0..N {
+        (0..N).for_each(|i| {
             row[i] = unsafe { data.add(self.get_index(idx, i)).as_ref().unwrap() };
-        }
+        });
 
         Row(row)
     }
@@ -303,9 +293,9 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
         let mut col = [&0.0; M];
 
         let data = self.data.as_ptr();
-        for i in 0..M {
+        (0..M).for_each(|i| {
             col[i] = unsafe { data.add(self.get_index(i, idx)).as_ref().unwrap() };
-        }
+        });
 
         Col(col)
     }
@@ -340,7 +330,7 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
     /// Returns a new matrix containing the result of the matrix multiplaction of `self` and
     /// `other`.
     fn mul<const P: usize>(&self, other: &Matrix<N, P>) -> Matrix<M, P> {
-        let res = Matrix::from_vec(vec![0.0; M * P]);
+        let mut res = Matrix::from_vec(vec![0.0; M * P]);
 
         for i in 0..M {
             for j in 0..P {
