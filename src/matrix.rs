@@ -35,7 +35,7 @@ impl<'a, const N: usize> Index<usize> for Row<'a, N> {
     fn index(&self, index: usize) -> &Self::Output {
         if index >= N {
             panic!(
-                "RowIndexOutOfBounds: The index {:?} is out of bounds; it must 
+                "RowIndexOutOfBounds: The index {:?} is out of bounds; it must
                 be less than {}.",
                 index, N,
             );
@@ -49,7 +49,7 @@ impl<'a, const N: usize> IndexMut<usize> for Row<'a, N> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         if index >= N {
             panic!(
-                "RowIndexOutOfBounds: The index {:?} is out of bounds; it must 
+                "RowIndexOutOfBounds: The index {:?} is out of bounds; it must
                 be less than {}.",
                 index, N,
             );
@@ -80,7 +80,7 @@ impl<'a, const M: usize> Index<usize> for Col<'a, M> {
     fn index(&self, index: usize) -> &Self::Output {
         if index >= M {
             panic!(
-                "RowIndexOutOfBounds: The index {:?} is out of bounds; it must 
+                "RowIndexOutOfBounds: The index {:?} is out of bounds; it must
                 be less than {}.",
                 index, M,
             );
@@ -93,7 +93,7 @@ impl<'a, const M: usize> IndexMut<usize> for Col<'a, M> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         if index >= M {
             panic!(
-                "RowIndexOutOfBounds: The index {:?} is out of bounds; it must 
+                "RowIndexOutOfBounds: The index {:?} is out of bounds; it must
                 be less than {}.",
                 index, M,
             );
@@ -142,6 +142,29 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
     // TODO: Add `identity`, `ones`, `zeros`, and `linspace` functions for initalizations
 
     // TODO: Generalize to all numerical types (not just f32)
+
+    /// Creates an identity matrix.
+    ///
+    /// ## Notes
+    /// The created matrix will have be square (`M x M`) matrix.
+    fn identity() -> Matrix<M, M> {
+        let mut v = vec![0.0;M*M];
+        for i in 0..M{
+            for j in 0..M {
+                if i == j {
+                    v[N * i + j] = 1.0;
+                }
+            }
+        }
+
+        let data = {
+            let mut v = mem::ManuallyDrop::new(v);
+            let data = v.as_mut_ptr();
+            NonNull::new(data).unwrap()
+        };
+
+        Matrix { data }
+    }
 
     /// Converts the matrix to a vector, consuming `self`.
     ///
@@ -307,6 +330,7 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
 
         res
     }
+
 }
 
 impl<const M: usize, const N: usize> Drop for Matrix<M, N> {
@@ -350,8 +374,11 @@ mod tests {
 
     #[test]
     fn can_init() {
-        let mat = Matrix::<3, 2>::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
-        dbg!(&mat);
+        let _mat = Matrix::<3, 2>::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+        // dbg!(&mat);
+
+        let _eye = Matrix::<6,6>::identity();
+        // dbg!(&eye);
     }
 
     #[test]
@@ -398,18 +425,18 @@ mod tests {
         let b = Matrix::<3, 2>::from_vec(vec![7.0, 8.0, 9.0, 10.0, 11.0, 12.0]);
 
         let c = a.mul(&b);
-
-        // FIXME: Add asserts!
-        dbg!(a);
-        dbg!(b);
-        dbg!(c);
+        assert_eq!(c.row(0)[0], 58.0);
+        assert_eq!(c.row(0)[1], 64.0);
+        assert_eq!(c.row(1)[0], 139.0);
+        assert_eq!(c.row(1)[1], 154.0);
 
         let a = Matrix::<2, 2>::from_vec(vec![1.0, 2.0, 3.0, 4.0]);
         let b = Matrix::<2, 2>::from_vec(vec![5.0, 6.0, 7.0, 8.0]);
 
         let c = a.mul(&b);
-        dbg!(a);
-        dbg!(b);
-        dbg!(c);
+        assert_eq!(c.row(0)[0], 19.0);
+        assert_eq!(c.row(0)[1], 22.0);
+        assert_eq!(c.row(1)[0], 43.0);
+        assert_eq!(c.row(1)[1], 50.0);
     }
 }
