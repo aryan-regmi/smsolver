@@ -1,4 +1,11 @@
-use std::{fmt, marker::PhantomData, mem::ManuallyDrop, ops::Index, ptr::NonNull, usize};
+use std::{
+    fmt,
+    marker::PhantomData,
+    mem::ManuallyDrop,
+    ops::{Index, IndexMut},
+    ptr::NonNull,
+    usize,
+};
 use thiserror::Error;
 
 // NOTE: N * row + col
@@ -173,6 +180,60 @@ impl<const M: usize, const N: usize, T> Matrix<M, N, T> {
     }
 }
 
+impl<const M: usize, const N: usize, T> Index<(usize, usize)> for Matrix<M, N, T> {
+    type Output = T;
+
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        if index.0 >= M {
+            panic!(
+                "{}",
+                MatrixError::IndexOutOfBounds(format!("The row index must be less than {}", M))
+                    .to_string()
+            );
+        } else if index.1 >= N {
+            panic!(
+                "{}",
+                MatrixError::IndexOutOfBounds(format!("The column index must be less than {}", N))
+                    .to_string()
+            );
+        }
+
+        unsafe {
+            self.data
+                .as_ptr()
+                .add(N * index.0 + index.1)
+                .as_ref()
+                .unwrap()
+        }
+    }
+}
+
+impl<const M: usize, const N: usize, T> IndexMut<(usize, usize)> for Matrix<M, N, T> {
+    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+        if index.0 >= M {
+            panic!(
+                "{}",
+                MatrixError::IndexOutOfBounds(format!("The row index must be less than {}", M))
+                    .to_string()
+            );
+        } else if index.1 >= N {
+            panic!(
+                "{}",
+                MatrixError::IndexOutOfBounds(format!("The column index must be less than {}", N))
+                    .to_string()
+            );
+        }
+
+        unsafe {
+            self.data
+                .as_ptr()
+                .add(N * index.0 + index.1)
+                .as_mut()
+                .unwrap()
+        }
+    }
+}
+
 impl<const M: usize, const N: usize, T> Drop for Matrix<M, N, T> {
     fn drop(&mut self) {
         unsafe {
@@ -193,8 +254,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn can_init() {
+    fn can_init() -> MatrixResult<()> {
         let mat: Matrix<2, 2> = Matrix::new();
-        dbg!(mat);
+        dbg!(mat[(0, 0)]);
+
+        Ok(())
     }
 }
