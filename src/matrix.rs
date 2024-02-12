@@ -172,6 +172,28 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
         Matrix { data }
     }
 
+    /// Creates a (`M x 1`) matrix from a `Col<M>`.
+    fn from_col(col: &Col<M>) -> Matrix<M, 1> {
+        let mut v = vec![0.0; M];
+
+        for i in 0..M {
+            v[i] = col[i];
+        }
+
+        Matrix::from_vec(v)
+    }
+
+    /// Creates a (`1 x N`) matrix from a `Row<N>`.
+    fn from_row(row: &Row<N>) -> Matrix<1, N> {
+        let mut v = vec![0.0; N];
+
+        for i in 0..N {
+            v[i] = row[i];
+        }
+
+        Matrix::from_vec(v)
+    }
+
     // TODO: Add `from_slice` and `from_array` functions
 
     // TODO: Add `from_array_slice` functions (matrix from slice of array i.e `&[[1.0, 2.0],[3.0, 4.0]]`)
@@ -298,6 +320,7 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
         Col(col)
     }
 
+
     // TODO: Add `reshape` function (convert to any combination of M*N, consuming `self`)
 
     /// Returns a new matrix whose elements are the elements of `self` multiplied by the given
@@ -314,13 +337,16 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
     }
 
     /// Multiplies all elements of `self` by the given `scalar` inplace.
-    fn scale_inplace(&mut self, scalar: f32) {
+    fn scale_inplace(self, scalar: f32) -> Self {
         let data = unsafe { slice::from_raw_parts_mut(self.data.as_ptr(), M * N) };
 
         for val in data {
             *val *= scalar;
         }
+
+        self
     }
+
 
     // NOTE: Use more efficient algorithim
     //  - Specialize for square matricies, etc
@@ -343,11 +369,179 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
         res
     }
 
-    /// Returns the QR-factorization of the matrix using the Householder method.
-    fn qr_factorization(&self) -> (Matrix<M,M>, Matrix<M,N>) {
-        let mut q = Matrix::<M,N>::identity();
-        let mut r = self.clone();
+    /// Returns a new matrix that has the `scalar` added to each element of
+    /// `self`.
+    fn add_scalar(&self, scalar: f32) -> Matrix<M, N> {
+        let mut res = self.clone();
 
+        for i in 0..M {
+            for j in 0..N {
+                *res.index_mut(i, j) = self.index(i, j) + scalar;
+            }
+        }
+
+        res
+    }
+
+    /// Adds the `scalar` to each element of `self` inplace.
+    fn add_scalar_inplace(mut self, scalar: f32) -> Matrix<M, N> {
+        for i in 0..M {
+            for j in 0..N {
+                *self.index_mut(i, j) = self.index(i, j) + scalar;
+            }
+        }
+
+        self
+    }
+
+    /// Returns a new matrix that has the `scalar` subtracted from each
+    /// element of `self`.
+    fn sub_scalar(&self, scalar: f32) -> Matrix<M, N> {
+        let mut res = self.clone();
+
+        for i in 0..M {
+            for j in 0..N {
+                *res.index_mut(i, j) = self.index(i, j) - scalar;
+            }
+        }
+
+        res
+    }
+
+    /// Subtracts the `scalar` from each element of `self` inplace.
+    fn sub_scalar_inplace(mut self, scalar: f32) -> Matrix<M, N> {
+        for i in 0..M {
+            for j in 0..N {
+                *self.index_mut(i, j) = self.index(i, j) - scalar;
+            }
+        }
+
+        self
+    }
+
+    /// Returns a new matrix that has the each element subtracted from the
+    /// `scalar`.
+    fn scalar_sub(&self, scalar: f32) -> Matrix<M, N> {
+        let mut res = self.clone();
+
+        for i in 0..M {
+            for j in 0..N {
+                *res.index_mut(i, j) = scalar - self.index(i, j);
+            }
+        }
+
+        res
+    }
+
+    /// Subtracts each element of `self` from `scalar` inplace.
+    fn scalar_sub_inplace(mut self, scalar: f32) -> Matrix<M, N> {
+        for i in 0..M {
+            for j in 0..N {
+                *self.index_mut(i, j) = scalar - self.index(i, j);
+            }
+        }
+
+        self
+    }
+
+
+    /// Computes the transpose of the matrix.
+    fn transpose(&self) -> Matrix<N,M> {
+        let mut tranposed = Matrix::<N,M>::from_vec(vec![0.0; M*N]);
+
+        for i in 0..N {
+            for j in 0..M {
+                *tranposed.index_mut(i, j) = *self.index(j, i);
+            }
+        }
+
+        tranposed
+    }
+
+    /// Calculates the norm of `self`.
+    fn norm(&self) -> f32 {
+        let mut sums = [0.0;N];
+        for col in 0..N {
+            for row in 0..M {
+                sums[col] += self.col(col)[row];
+            }
+        }
+        sums.sort_by(|a,b| f32::partial_cmp(b, a).unwrap());
+        sums[0]
+    }
+
+    /// Returns a matrix that is `1.0` for any element of `self` that is
+    /// positive, and `-1.0` for any negative element.
+    fn signs(&self) -> Self {
+        let mut signs = vec![-1.0; M*N];
+
+        for row in 0..M {
+            for col in 0..N {
+                if *self.index(row, col) >= 0.0 {
+                    signs[self.get_index(row, col)] = 1.0;
+                }
+            }
+        }
+
+        Self::from_vec(signs)
+    }
+
+    /// Returns the QR-factorization of the matrix using the Householder method.
+    fn qr_factorization(&self) -> (Matrix<M,N>, Matrix<M,N>) {
+        let mut q = {
+            let q = Matrix::<M,N>::default();
+            for i in 0..M {
+                for j in 0..M {
+                    if i == j {
+                        *q.index_mut(i, j) = 1.0;
+                    }
+                }
+            }
+            q
+        };
+        let mut r = self.clone();
+        let signs = r.signs();
+
+        for j in 0..N {
+            let normx = Matrix::<M,1>::from_col(&r.col(j)).norm();
+            let s = -1.0 * signs.index(j, j);
+            let u1 = r.index(j, j) - s*normx;
+            let r_col = &mut r.col(j);
+            let q_row = &mut q.row(j);
+            let mut w = Matrix::<M,1>::from_col(r_col).scale_inplace(1.0/u1);
+            *w.index_mut(0, j) = 1.0;
+            let tau = -s*u1/normx;
+
+            for i in 0..M {
+                let combined_terms = {
+                    let term1 = w.scale(tau);
+                    let term2 = w.transpose().scale(r_col[i]);
+                    term1.mul(&term2)
+                };
+                r_col[i] = *combined_terms.scalar_sub(r_col[i]).index(i, j);
+
+                let combined_terms = {
+                    let term1 = w.scale(q_row[i]);
+                    let term2 = w.scale(tau).transpose();
+                    term1.mul(&term2)
+                };
+                q_row[i] = *combined_terms.scalar_sub(q_row[i]).index(i, j);
+            }
+        }
+        (q, r)
+    }
+
+    // TODO: Have different types for square, rectangle, triangle, row, col
+    // matrices
+    //
+    // Returns the new matrix that is the inverse of `self`.
+    fn inverse(&self) -> Self {
+        let (q, r) = self.qr_factorization();
+
+        r.inverse().mul::<N>(&q.transpose())
+    }
+
+    fn inverse_inplace(mut self) -> Self {
         todo!()
     }
 
