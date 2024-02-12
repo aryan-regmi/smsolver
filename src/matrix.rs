@@ -32,6 +32,13 @@ impl ViewType for Col {}
 struct Mat;
 impl ViewType for Mat {}
 
+// TODO: Remove ViewType, imitate Matrix instead MatrixView<M,N,T>
+//
+/// An immutable view into a matrix.
+///
+/// ## Note
+/// All operations on a `MatrixView` will create and return new matricies. If in-place operations
+/// are required, then they should be done on the raw `Matrix` itself.
 #[derive(Clone, Copy)]
 struct MatrixView<T, V: ViewType = Row> {
     data: NonNull<T>,
@@ -129,6 +136,11 @@ impl<T> Index<(usize, usize)> for MatrixView<T, Mat> {
     }
 }
 
+/// A `M x N` matrix containing elements of type `T`.
+///
+/// ## Note
+/// All operations on a `Matrix` are done in-place; use `MatrixView` if the original matrix should
+/// remain unchanged.
 struct Matrix<const M: usize, const N: usize, T = f32> {
     data: NonNull<T>,
 }
@@ -177,6 +189,21 @@ impl<const M: usize, const N: usize, T> Matrix<M, N, T> {
             dimension: Dimension { rows: M, cols: 1 },
             _marker: PhantomData,
         })
+    }
+}
+
+impl<const M: usize, const N: usize, T> Drop for Matrix<M, N, T> {
+    fn drop(&mut self) {
+        unsafe {
+            Vec::from_raw_parts(self.data.as_mut(), M * N, M * N);
+        }
+    }
+}
+
+impl<const M: usize, const N: usize, T> fmt::Debug for Matrix<M, N, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", format_args!("Matrix ({} x {}) [\n", M, N))?;
+        todo!()
     }
 }
 
@@ -231,21 +258,6 @@ impl<const M: usize, const N: usize, T> IndexMut<(usize, usize)> for Matrix<M, N
                 .as_mut()
                 .unwrap()
         }
-    }
-}
-
-impl<const M: usize, const N: usize, T> Drop for Matrix<M, N, T> {
-    fn drop(&mut self) {
-        unsafe {
-            Vec::from_raw_parts(self.data.as_mut(), M * N, M * N);
-        }
-    }
-}
-
-impl<const M: usize, const N: usize, T> fmt::Debug for Matrix<M, N, T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", format_args!("Matrix ({} x {}) [\n", M, N))?;
-        todo!()
     }
 }
 
