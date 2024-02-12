@@ -1,6 +1,5 @@
 use std::{
     fmt,
-    marker::PhantomData,
     mem::ManuallyDrop,
     ops::{Index, IndexMut},
     ptr::NonNull,
@@ -40,98 +39,34 @@ impl ViewType for Mat {}
 /// All operations on a `MatrixView` will create and return new matricies. If in-place operations
 /// are required, then they should be done on the raw `Matrix` itself.
 #[derive(Clone, Copy)]
-struct MatrixView<T, V: ViewType = Row> {
+struct MatrixView<const M: usize, const N: usize, T> {
     data: NonNull<T>,
     start_row: usize,
     start_col: usize,
-    dimension: Dimension,
-    _marker: PhantomData<V>,
 }
 
-impl<T> Index<usize> for MatrixView<T, Row> {
-    type Output = T;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        if index >= self.dimension.cols {
-            panic!(
-                "{}",
-                MatrixError::IndexOutOfBounds(format!(
-                    "The column index must be less than {}",
-                    self.dimension.cols
-                ))
-                .to_string()
-            );
-        }
-
-        unsafe {
-            let col = self.start_col + index;
-            self.data
-                .as_ptr()
-                .add(self.dimension.cols * self.start_row + col)
-                .as_ref()
-                .unwrap()
-        }
-    }
-}
-
-impl<T> Index<usize> for MatrixView<T, Col> {
-    type Output = T;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        if index >= self.dimension.rows {
-            panic!(
-                "{}",
-                MatrixError::IndexOutOfBounds(format!(
-                    "The row index must be less than {}",
-                    self.dimension.rows
-                ))
-                .to_string()
-            );
-        }
-
-        unsafe {
-            let row = index + self.start_row;
-            self.data
-                .as_ptr()
-                .add(self.dimension.cols * row + self.start_col)
-                .as_ref()
-                .unwrap()
-        }
-    }
-}
-
-impl<T> Index<(usize, usize)> for MatrixView<T, Mat> {
+impl<const M: usize, const N: usize, T> Index<(usize, usize)> for MatrixView<M, N, T> {
     type Output = T;
 
     fn index(&self, index: (usize, usize)) -> &Self::Output {
-        if index.0 >= self.dimension.rows {
+        if index.0 >= M {
             panic!(
                 "{}",
-                MatrixError::IndexOutOfBounds(format!(
-                    "The row index must be less than {}",
-                    self.dimension.rows
-                ))
-                .to_string()
+                MatrixError::IndexOutOfBounds(format!("The row index must be less than {}", M))
+                    .to_string()
             );
-        } else if index.1 >= self.dimension.cols {
+        } else if index.1 >= N {
             panic!(
                 "{}",
-                MatrixError::IndexOutOfBounds(format!(
-                    "The column index must be less than {}",
-                    self.dimension.cols
-                ))
-                .to_string()
+                MatrixError::IndexOutOfBounds(format!("The column index must be less than {}", N))
+                    .to_string()
             );
         }
 
         unsafe {
             let row = index.0 + self.start_row;
             let col = index.1 + self.start_col;
-            self.data
-                .as_ptr()
-                .add(self.dimension.cols * row + col)
-                .as_ref()
-                .unwrap()
+            self.data.as_ptr().add(N * row + col).as_ref().unwrap()
         }
     }
 }
@@ -157,7 +92,7 @@ impl<const M: usize, const N: usize, T: Default + Clone> Matrix<M, N, T> {
 }
 
 impl<const M: usize, const N: usize, T> Matrix<M, N, T> {
-    fn row(&self, index: usize) -> MatrixResult<MatrixView<T, Row>> {
+    fn row(&self, index: usize) -> MatrixResult<MatrixView<1, N, T>> {
         if index >= M {
             return Err(MatrixError::IndexOutOfBounds(format!(
                 "The row index cannot be greater than or equal to {}",
@@ -165,16 +100,14 @@ impl<const M: usize, const N: usize, T> Matrix<M, N, T> {
             )));
         }
 
-        Ok(MatrixView::<T, Row> {
+        Ok(MatrixView {
             data: self.data.clone(),
             start_row: index,
             start_col: 0,
-            dimension: Dimension { rows: 1, cols: N },
-            _marker: PhantomData,
         })
     }
 
-    fn col(&self, index: usize) -> MatrixResult<MatrixView<T, Col>> {
+    fn col(&self, index: usize) -> MatrixResult<MatrixView<M, 1, T>> {
         if index >= N {
             return Err(MatrixError::IndexOutOfBounds(format!(
                 "The column index cannot be greater than or equal to {}",
@@ -182,12 +115,10 @@ impl<const M: usize, const N: usize, T> Matrix<M, N, T> {
             )));
         }
 
-        Ok(MatrixView::<T, Col> {
+        Ok(MatrixView {
             data: self.data.clone(),
             start_row: 0,
             start_col: index,
-            dimension: Dimension { rows: M, cols: 1 },
-            _marker: PhantomData,
         })
     }
 }
@@ -268,7 +199,8 @@ mod tests {
     #[test]
     fn can_init() -> MatrixResult<()> {
         let mat: Matrix<2, 2> = Matrix::new();
-        dbg!(mat[(0, 0)]);
+        // dbg!(mat[(0, 0)]);
+        // dbg!(mat.row(0)?[(0, 1)]);
 
         Ok(())
     }
