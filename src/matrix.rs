@@ -1,6 +1,8 @@
 use core::{fmt, slice};
 use std::{
-     mem, ops::{Index, IndexMut}, ptr::NonNull
+    mem,
+    ops::{Index, IndexMut},
+    ptr::NonNull,
 };
 
 /// Represents a row from a matrix.
@@ -129,8 +131,8 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
     /// ## Notes
     /// The created matrix will have be square (`M x M`) matrix.
     fn identity() -> Matrix<M, M> {
-        let mut v = vec![0.0;M*M];
-        for i in 0..M{
+        let mut v = vec![0.0; M * M];
+        for i in 0..M {
             for j in 0..M {
                 if i == j {
                     v[N * i + j] = 1.0;
@@ -149,7 +151,7 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
 
     /// Creates a matrix of zeros.
     fn zeros() -> Matrix<M, N> {
-        let v = vec![0.0;M*N];
+        let v = vec![0.0; M * N];
         let data = {
             let mut v = mem::ManuallyDrop::new(v);
             let data = v.as_mut_ptr();
@@ -161,7 +163,7 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
 
     /// Creates a matrix of ones.
     fn ones() -> Matrix<M, N> {
-        let v = vec![1.0;M*N];
+        let v = vec![1.0; M * N];
 
         let data = {
             let mut v = mem::ManuallyDrop::new(v);
@@ -320,7 +322,6 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
         Col(col)
     }
 
-
     // TODO: Add `reshape` function (convert to any combination of M*N, consuming `self`)
 
     /// Returns a new matrix whose elements are the elements of `self` multiplied by the given
@@ -346,7 +347,6 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
 
         self
     }
-
 
     // NOTE: Use more efficient algorithim
     //  - Specialize for square matricies, etc
@@ -444,10 +444,9 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
         self
     }
 
-
     /// Computes the transpose of the matrix.
-    fn transpose(&self) -> Matrix<N,M> {
-        let mut tranposed = Matrix::<N,M>::from_vec(vec![0.0; M*N]);
+    fn transpose(&self) -> Matrix<N, M> {
+        let mut tranposed = Matrix::<N, M>::from_vec(vec![0.0; M * N]);
 
         for i in 0..N {
             for j in 0..M {
@@ -460,20 +459,20 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
 
     /// Calculates the norm of `self`.
     fn norm(&self) -> f32 {
-        let mut sums = [0.0;N];
+        let mut sums = [0.0; N];
         for col in 0..N {
             for row in 0..M {
                 sums[col] += self.col(col)[row];
             }
         }
-        sums.sort_by(|a,b| f32::partial_cmp(b, a).unwrap());
+        sums.sort_by(|a, b| f32::partial_cmp(b, a).unwrap());
         sums[0]
     }
 
     /// Returns a matrix that is `1.0` for any element of `self` that is
     /// positive, and `-1.0` for any negative element.
     fn signs(&self) -> Self {
-        let mut signs = vec![-1.0; M*N];
+        let mut signs = vec![-1.0; M * N];
 
         for row in 0..M {
             for col in 0..N {
@@ -487,9 +486,9 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
     }
 
     /// Returns the QR-factorization of the matrix using the Householder method.
-    fn qr_factorization(&self) -> (Matrix<M,N>, Matrix<M,N>) {
+    fn qr_factorization(&self) -> (Matrix<M, N>, Matrix<M, N>) {
         let mut q = {
-            let q = Matrix::<M,N>::default();
+            let mut q = Matrix::<M, N>::default();
             for i in 0..M {
                 for j in 0..M {
                     if i == j {
@@ -503,14 +502,14 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
         let signs = r.signs();
 
         for j in 0..N {
-            let normx = Matrix::<M,1>::from_col(&r.col(j)).norm();
+            let normx = Matrix::<M, 1>::from_col(&r.col(j)).norm();
             let s = -1.0 * signs.index(j, j);
-            let u1 = r.index(j, j) - s*normx;
+            let u1 = r.index(j, j) - s * normx;
             let r_col = &mut r.col(j);
             let q_row = &mut q.row(j);
-            let mut w = Matrix::<M,1>::from_col(r_col).scale_inplace(1.0/u1);
+            let mut w = Matrix::<M, 1>::from_col(r_col).scale_inplace(1.0 / u1);
             *w.index_mut(0, j) = 1.0;
-            let tau = -s*u1/normx;
+            let tau = -s * u1 / normx;
 
             for i in 0..M {
                 let combined_terms = {
@@ -538,23 +537,24 @@ impl<const M: usize, const N: usize> Matrix<M, N> {
     fn inverse(&self) -> Self {
         let (q, r) = self.qr_factorization();
 
-        r.inverse().mul::<N>(&q.transpose())
+        let x = r.inverse().mul::<M>(&q.transpose());
+
+        todo!()
     }
 
     fn inverse_inplace(mut self) -> Self {
         todo!()
     }
-
 }
 
 impl<const N: usize> Matrix<1, N> {
     /// Creates a 1xP matrix with values from `start` to `end` spaced linearly.
     fn linspace(start: f32, end: f32) -> Self {
-        let h = (end - start)/(N-1) as f32;
-        let mut v = vec![0.0;N];
+        let h = (end - start) / (N - 1) as f32;
+        let mut v = vec![0.0; N];
         v[0] = start;
         (1..N).for_each(|i| {
-            v[i] = v[i-1]+ h;
+            v[i] = v[i - 1] + h;
         });
 
         let data = {
@@ -563,7 +563,7 @@ impl<const N: usize> Matrix<1, N> {
             NonNull::new(data).unwrap()
         };
 
-       Self { data }
+        Self { data }
     }
 }
 
@@ -616,13 +616,13 @@ mod tests {
         let _mat = Matrix::<3, 2>::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
         // dbg!(mat);
 
-        let _eye = Matrix::<6,6>::identity();
+        let _eye = Matrix::<6, 6>::identity();
         // dbg!(eye);
 
-        let _lin: Matrix<1,5> = Matrix::linspace(1.0,10.0);
+        let _lin: Matrix<1, 5> = Matrix::linspace(1.0, 10.0);
         // dbg!(lin);
 
-        let _zeros: Matrix<2,5> = Matrix::default();
+        let _zeros: Matrix<2, 5> = Matrix::default();
         // dbg!(zeros);
     }
 
@@ -660,7 +660,7 @@ mod tests {
             vec.iter().map(|x| x * 2.0).collect::<Vec<_>>()
         );
 
-        mat.scale_inplace(2.0);
+        mat = mat.scale_inplace(2.0);
         assert_eq!(mat.as_slice(), scaled.as_slice());
     }
 
@@ -683,5 +683,12 @@ mod tests {
         assert_eq!(c.row(0)[1], 22.0);
         assert_eq!(c.row(1)[0], 43.0);
         assert_eq!(c.row(1)[1], 50.0);
+    }
+
+    #[test]
+    fn can_inverse() {
+        let mat = Matrix::<2, 2>::from_vec(vec![4., 7., 2., 6.]);
+        dbg!(&mat);
+        dbg!(&mat.inverse());
     }
 }
