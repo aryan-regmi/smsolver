@@ -109,6 +109,10 @@ impl<const M: usize, const N: usize, T> Matrix<M, N, T> {
         (M, N)
     }
 
+    const fn is_square(&self) -> bool {
+        M == N
+    }
+
     fn row(&self, index: usize) -> MatrixResult<MatrixView<T>> {
         if index >= M {
             return Err(MatrixError::IndexOutOfBounds(format!(
