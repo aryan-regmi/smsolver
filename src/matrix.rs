@@ -39,34 +39,47 @@ impl ViewType for Mat {}
 /// All operations on a `MatrixView` will create and return new matricies. If in-place operations
 /// are required, then they should be done on the raw `Matrix` itself.
 #[derive(Clone, Copy)]
-struct MatrixView<const M: usize, const N: usize, T> {
+struct MatrixView<T> {
     data: NonNull<T>,
     start_row: usize,
     start_col: usize,
+    dimension: Dimension,
 }
 
-impl<const M: usize, const N: usize, T> Index<(usize, usize)> for MatrixView<M, N, T> {
+impl<T> Index<(usize, usize)> for MatrixView<T> {
     type Output = T;
 
     fn index(&self, index: (usize, usize)) -> &Self::Output {
-        if index.0 >= M {
+        let num_rows = self.dimension.rows;
+        let num_cols = self.dimension.cols;
+        if index.0 >= num_rows {
             panic!(
                 "{}",
-                MatrixError::IndexOutOfBounds(format!("The row index must be less than {}", M))
-                    .to_string()
+                MatrixError::IndexOutOfBounds(format!(
+                    "The row index must be less than {}",
+                    num_rows
+                ))
+                .to_string()
             );
-        } else if index.1 >= N {
+        } else if index.1 >= num_cols {
             panic!(
                 "{}",
-                MatrixError::IndexOutOfBounds(format!("The column index must be less than {}", N))
-                    .to_string()
+                MatrixError::IndexOutOfBounds(format!(
+                    "The column index must be less than {}",
+                    num_cols
+                ))
+                .to_string()
             );
         }
 
         unsafe {
             let row = index.0 + self.start_row;
             let col = index.1 + self.start_col;
-            self.data.as_ptr().add(N * row + col).as_ref().unwrap()
+            self.data
+                .as_ptr()
+                .add(num_cols * row + col)
+                .as_ref()
+                .unwrap()
         }
     }
 }
@@ -92,7 +105,11 @@ impl<const M: usize, const N: usize, T: Default + Clone> Matrix<M, N, T> {
 }
 
 impl<const M: usize, const N: usize, T> Matrix<M, N, T> {
-    fn row(&self, index: usize) -> MatrixResult<MatrixView<1, N, T>> {
+    const fn size(&self) -> (usize, usize) {
+        (M, N)
+    }
+
+    fn row(&self, index: usize) -> MatrixResult<MatrixView<T>> {
         if index >= M {
             return Err(MatrixError::IndexOutOfBounds(format!(
                 "The row index cannot be greater than or equal to {}",
@@ -104,10 +121,11 @@ impl<const M: usize, const N: usize, T> Matrix<M, N, T> {
             data: self.data.clone(),
             start_row: index,
             start_col: 0,
+            dimension: Dimension { rows: 1, cols: N },
         })
     }
 
-    fn col(&self, index: usize) -> MatrixResult<MatrixView<M, 1, T>> {
+    fn col(&self, index: usize) -> MatrixResult<MatrixView<T>> {
         if index >= N {
             return Err(MatrixError::IndexOutOfBounds(format!(
                 "The column index cannot be greater than or equal to {}",
@@ -119,6 +137,31 @@ impl<const M: usize, const N: usize, T> Matrix<M, N, T> {
             data: self.data.clone(),
             start_row: 0,
             start_col: index,
+            dimension: Dimension { rows: M, cols: 1 },
+        })
+    }
+
+    fn view(
+        &self,
+        start_row: usize,
+        start_col: usize,
+        dimension: Dimension,
+    ) -> MatrixResult<MatrixView<T>> {
+        // FIXME: Write error messages
+        if start_row >= M {
+            panic!()
+        } else if start_col >= N {
+            panic!()
+        } else if dimension.rows > M {
+            panic!()
+        } else if dimension.cols > N {
+        }
+
+        Ok(MatrixView {
+            data: self.data.clone(),
+            start_row,
+            start_col,
+            dimension,
         })
     }
 }
@@ -199,9 +242,7 @@ mod tests {
     #[test]
     fn can_init() -> MatrixResult<()> {
         let mat: Matrix<2, 2> = Matrix::new();
-        // dbg!(mat[(0, 0)]);
-        // dbg!(mat.row(0)?[(0, 1)]);
-
+        assert_eq!(mat.size(), (2, 2));
         Ok(())
     }
 }
