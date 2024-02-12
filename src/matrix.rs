@@ -1,609 +1,190 @@
-use core::{fmt, slice};
-use std::{
-    mem,
-    ops::{Index, IndexMut},
-    ptr::NonNull,
-};
+use std::{fmt, marker::PhantomData, mem::ManuallyDrop, ops::Index, ptr::NonNull, usize};
+use thiserror::Error;
 
-/// Represents a row from a matrix.
-#[derive(Clone)]
-struct Row<'a, const N: usize>([&'a f32; N]);
+// NOTE: N * row + col
 
-impl<'a, const N: usize> fmt::Debug for Row<'a, N> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[")?;
-        for val in self.0 {
-            write!(f, " {} ", val)?;
-        }
-        write!(f, "]")
-    }
+#[derive(Debug, Error)]
+enum MatrixError {
+    #[error("InvalidIndex: {0}")]
+    IndexOutOfBounds(String),
 }
 
-impl<'a, const N: usize> Index<usize> for Row<'a, N> {
-    type Output = f32;
+type MatrixResult<T> = Result<T, MatrixError>;
+
+#[derive(Debug, Clone, Copy)]
+struct Dimension {
+    rows: usize,
+    cols: usize,
+}
+
+trait ViewType {}
+struct Row;
+impl ViewType for Row {}
+struct Col;
+impl ViewType for Col {}
+struct Mat;
+impl ViewType for Mat {}
+
+#[derive(Clone, Copy)]
+struct MatrixView<T, V: ViewType = Row> {
+    data: NonNull<T>,
+    start_row: usize,
+    start_col: usize,
+    dimension: Dimension,
+    _marker: PhantomData<V>,
+}
+
+impl<T> Index<usize> for MatrixView<T, Row> {
+    type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
-        if index >= N {
+        if index >= self.dimension.cols {
             panic!(
-                "RowIndexOutOfBounds: The index {:?} is out of bounds; it must
-                be less than {}.",
-                index, N,
+                "{}",
+                MatrixError::IndexOutOfBounds(format!(
+                    "The column index must be less than {}",
+                    self.dimension.cols
+                ))
+                .to_string()
             );
         }
 
-        self.0[index]
-    }
-}
-
-impl<'a, const N: usize> IndexMut<usize> for Row<'a, N> {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        if index >= N {
-            panic!(
-                "RowIndexOutOfBounds: The index {:?} is out of bounds; it must
-                be less than {}.",
-                index, N,
-            );
+        unsafe {
+            let col = self.start_col + index;
+            self.data
+                .as_ptr()
+                .add(self.dimension.cols * self.start_row + col)
+                .as_ref()
+                .unwrap()
         }
-        let val = self.0[index] as *const f32;
-        unsafe { (val as *mut f32).as_mut().unwrap() }
     }
 }
 
-/// Represents a column from a matrix.
-#[derive(Clone)]
-struct Col<'a, const M: usize>([&'a f32; M]);
-
-impl<'a, const M: usize> fmt::Debug for Col<'a, M> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "[n")?;
-        for (i, val) in self.0.iter().enumerate() {
-            if i != self.0.len() {
-                write!(f, "\t{}\n ", val)?;
-            }
-        }
-        write!(f, "]")
-    }
-}
-
-impl<'a, const M: usize> Index<usize> for Col<'a, M> {
-    type Output = f32;
+impl<T> Index<usize> for MatrixView<T, Col> {
+    type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
-        if index >= M {
+        if index >= self.dimension.rows {
             panic!(
-                "RowIndexOutOfBounds: The index {:?} is out of bounds; it must
-                be less than {}.",
-                index, M,
+                "{}",
+                MatrixError::IndexOutOfBounds(format!(
+                    "The row index must be less than {}",
+                    self.dimension.rows
+                ))
+                .to_string()
             );
         }
-        self.0[index]
+
+        unsafe {
+            let row = index + self.start_row;
+            self.data
+                .as_ptr()
+                .add(self.dimension.cols * row + self.start_col)
+                .as_ref()
+                .unwrap()
+        }
     }
 }
 
-impl<'a, const M: usize> IndexMut<usize> for Col<'a, M> {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        if index >= M {
+impl<T> Index<(usize, usize)> for MatrixView<T, Mat> {
+    type Output = T;
+
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        if index.0 >= self.dimension.rows {
             panic!(
-                "RowIndexOutOfBounds: The index {:?} is out of bounds; it must
-                be less than {}.",
-                index, M,
+                "{}",
+                MatrixError::IndexOutOfBounds(format!(
+                    "The row index must be less than {}",
+                    self.dimension.rows
+                ))
+                .to_string()
+            );
+        } else if index.1 >= self.dimension.cols {
+            panic!(
+                "{}",
+                MatrixError::IndexOutOfBounds(format!(
+                    "The column index must be less than {}",
+                    self.dimension.cols
+                ))
+                .to_string()
             );
         }
-        let val = self.0[index] as *const f32;
-        unsafe { (val as *mut f32).as_mut().unwrap() }
+
+        unsafe {
+            let row = index.0 + self.start_row;
+            let col = index.1 + self.start_col;
+            self.data
+                .as_ptr()
+                .add(self.dimension.cols * row + col)
+                .as_ref()
+                .unwrap()
+        }
     }
 }
 
-// TODO: Impl iterator trait
-//
-/// A `M x N` matrix (with `M` rows and `N` columns).
-struct Matrix<const M: usize, const N: usize> {
-    data: NonNull<f32>,
+struct Matrix<const M: usize, const N: usize, T = f32> {
+    data: NonNull<T>,
 }
 
-impl<const M: usize, const N: usize> Matrix<M, N> {
-    /// Create a `M x N` matrix from the given vector.
-    ///
-    /// ## Panics
-    /// Panics if the length of the vector is not `M * N` or if `M` or `N` are zero.
-    fn from_vec(v: Vec<f32>) -> Self {
-        if v.len() != M * N {
-            panic!(
-                "InvalidShape: The length of the vector must be {}, but was {}",
-                M * N,
-                v.len()
-            );
-        } else if (M == 0) || (N == 0) {
-            panic!("InvalidShape: Cannot create a matrix with `0` rows or columns");
-        }
-
+impl<const M: usize, const N: usize, T: Default + Clone> Matrix<M, N, T> {
+    fn new() -> Self {
         let data = {
-            let mut v = mem::ManuallyDrop::new(v);
-            let data = v.as_mut_ptr();
-            NonNull::new(data).unwrap()
-        };
-
-        Self { data }
-    }
-
-    /// Creates an identity matrix.
-    ///
-    /// ## Notes
-    /// The created matrix will have be square (`M x M`) matrix.
-    fn identity() -> Matrix<M, M> {
-        let mut v = vec![0.0; M * M];
-        for i in 0..M {
-            for j in 0..M {
-                if i == j {
-                    v[N * i + j] = 1.0;
-                }
-            }
-        }
-
-        let data = {
-            let mut v = mem::ManuallyDrop::new(v);
-            let data = v.as_mut_ptr();
-            NonNull::new(data).unwrap()
-        };
-
-        Matrix { data }
-    }
-
-    /// Creates a matrix of zeros.
-    fn zeros() -> Matrix<M, N> {
-        let v = vec![0.0; M * N];
-        let data = {
-            let mut v = mem::ManuallyDrop::new(v);
-            let data = v.as_mut_ptr();
-            NonNull::new(data).unwrap()
-        };
-
-        Matrix { data }
-    }
-
-    /// Creates a matrix of ones.
-    fn ones() -> Matrix<M, N> {
-        let v = vec![1.0; M * N];
-
-        let data = {
-            let mut v = mem::ManuallyDrop::new(v);
-            let data = v.as_mut_ptr();
-            NonNull::new(data).unwrap()
-        };
-
-        Matrix { data }
-    }
-
-    /// Creates a (`M x 1`) matrix from a `Col<M>`.
-    fn from_col(col: &Col<M>) -> Matrix<M, 1> {
-        let mut v = vec![0.0; M];
-
-        for i in 0..M {
-            v[i] = col[i];
-        }
-
-        Matrix::from_vec(v)
-    }
-
-    /// Creates a (`1 x N`) matrix from a `Row<N>`.
-    fn from_row(row: &Row<N>) -> Matrix<1, N> {
-        let mut v = vec![0.0; N];
-
-        for i in 0..N {
-            v[i] = row[i];
-        }
-
-        Matrix::from_vec(v)
-    }
-
-    // TODO: Add `from_slice` and `from_array` functions
-
-    // TODO: Add `from_array_slice` functions (matrix from slice of array i.e `&[[1.0, 2.0],[3.0, 4.0]]`)
-
-    // TODO: Generalize to all numerical types (not just f32)
-
-    /// Converts the matrix to a vector, consuming `self`.
-    ///
-    /// The vector elements will be in the order `N * row + col`.
-    ///
-    /// ## Safety
-    /// This uses `Vec::from_raw_parts`, and must satisfy all of its safety requirements.
-    fn to_vec(self) -> Vec<f32> {
-        unsafe { Vec::from_raw_parts(self.data.as_ptr(), M * N, M * N) }
-    }
-
-    /// Returns the matrix as an immutable slice of length `M * N`.
-    ///
-    /// The slice elements will be in the order `N * row + col`.
-    ///
-    /// ## Safety
-    /// This uses `slice::from_raw_parts`, and must satisfy all of its safety requirements.
-    fn as_slice<'a>(&self) -> &'a [f32] {
-        unsafe { slice::from_raw_parts(self.data.as_ptr(), M * N) }
-    }
-
-    /// Returns the matrix as a mutable slice of length `M * N`.
-    ///
-    /// The slice elements will be in the order `N * row + col`.
-    ///
-    /// ## Safety
-    /// This uses `slice::from_raw_parts`, and must satisfy all of its safety requirements.
-    fn as_slice_mut<'a>(&mut self) -> &'a mut [f32] {
-        unsafe { slice::from_raw_parts_mut(self.data.as_ptr(), M * N) }
-    }
-
-    /// Gets the index in the slice `data` of the matrix, for the specified row and column
-    /// indicies.
-    const fn get_index(&self, row: usize, col: usize) -> usize {
-        N * row + col
-    }
-
-    /// Returns an immutable reference to the element in the matrix at `[row, col]`.
-    ///
-    /// ## Panics
-    /// * Panics if `row` or `col` are greater than or equal `M` and `N` respectively.
-    fn index(&self, row: usize, col: usize) -> &f32 {
-        if (row >= M) || (col >= N) {
-            panic!(
-                "IndexOutOfBounds: The index {:?} is out of bounds. The row and
-                column indicies must be less than {} and {} respectively.",
-                (row, col),
-                M,
-                N
-            );
-        }
-
-        let data = self.data.as_ptr();
-
-        unsafe { data.add(self.get_index(row, col)).as_ref().unwrap() }
-    }
-
-    /// Returns a mutable reference to the element in the matrix at `[row, col]`.
-    ///
-    /// ## Panics
-    /// Panics if `row` or `col` are greater than `M` and `N` respectively.
-    fn index_mut(&mut self, row: usize, col: usize) -> &mut f32 {
-        if (row >= M) || (col >= N) {
-            panic!(
-                "IndexOutOfBounds: The index {:?} is out of bounds. The row and
-                column indicies must be less than {} and {} respectively.",
-                (row, col),
-                M,
-                N
-            );
-        }
-
-        let data = self.data.as_ptr();
-
-        unsafe { data.add(self.get_index(row, col)).as_mut().unwrap() }
-    }
-
-    /// Returns a `Row<N>` containing references to the elements in the specified row of the matrix.
-    ///
-    /// ## Panics
-    /// Panics if the index is greater than or equal to `M`.
-    fn row<'a>(&self, idx: usize) -> Row<'a, N> {
-        if idx >= M {
-            panic!(
-                "RowIndexOutOfBounds: The index {} is out of bounds. It must be
-                less than {}",
-                idx, M
-            );
-        }
-        let mut row = [&0.0; N];
-
-        let data = self.data.as_ptr();
-        (0..N).for_each(|i| {
-            row[i] = unsafe { data.add(self.get_index(idx, i)).as_ref().unwrap() };
-        });
-
-        Row(row)
-    }
-
-    /// Returns a `Col<M>` containing references to the elements in the specified row of the matrix.
-    ///
-    /// ## Panics
-    /// Panics if the index is greater than or equal to `N`.
-    fn col<'a>(&self, idx: usize) -> Col<'a, M> {
-        if idx >= N {
-            panic!(
-                "ColumnIndexOutOfBounds: The index {} is out of bounds. It must
-                be less than {}",
-                idx, N
-            );
-        }
-        let mut col = [&0.0; M];
-
-        let data = self.data.as_ptr();
-        (0..M).for_each(|i| {
-            col[i] = unsafe { data.add(self.get_index(i, idx)).as_ref().unwrap() };
-        });
-
-        Col(col)
-    }
-
-    // TODO: Add `reshape` function (convert to any combination of M*N, consuming `self`)
-
-    /// Returns a new matrix whose elements are the elements of `self` multiplied by the given
-    /// `scalar`.
-    fn scale(&self, scalar: f32) -> Self {
-        let data = unsafe { slice::from_raw_parts_mut(self.data.as_ptr(), M * N) };
-
-        let mut scaled = Vec::with_capacity(M * N);
-        for val in data {
-            scaled.push(*val * scalar);
-        }
-
-        Matrix::from_vec(scaled)
-    }
-
-    /// Multiplies all elements of `self` by the given `scalar` inplace.
-    fn scale_inplace(self, scalar: f32) -> Self {
-        let data = unsafe { slice::from_raw_parts_mut(self.data.as_ptr(), M * N) };
-
-        for val in data {
-            *val *= scalar;
-        }
-
-        self
-    }
-
-    // NOTE: Use more efficient algorithim
-    //  - Specialize for square matricies, etc
-    //
-    /// Returns a new matrix containing the result of the matrix multiplaction of `self` and
-    /// `other`.
-    fn mul<const P: usize>(&self, other: &Matrix<N, P>) -> Matrix<M, P> {
-        let mut res = Matrix::from_vec(vec![0.0; M * P]);
-
-        for i in 0..M {
-            for j in 0..P {
-                let mut sum = 0.0;
-                for k in 0..N {
-                    sum += self.index(i, k) * other.index(k, j);
-                }
-                *res.index_mut(i, j) = sum;
-            }
-        }
-
-        res
-    }
-
-    /// Returns a new matrix that has the `scalar` added to each element of
-    /// `self`.
-    fn add_scalar(&self, scalar: f32) -> Matrix<M, N> {
-        let mut res = self.clone();
-
-        for i in 0..M {
-            for j in 0..N {
-                *res.index_mut(i, j) = self.index(i, j) + scalar;
-            }
-        }
-
-        res
-    }
-
-    /// Adds the `scalar` to each element of `self` inplace.
-    fn add_scalar_inplace(mut self, scalar: f32) -> Matrix<M, N> {
-        for i in 0..M {
-            for j in 0..N {
-                *self.index_mut(i, j) = self.index(i, j) + scalar;
-            }
-        }
-
-        self
-    }
-
-    /// Returns a new matrix that has the `scalar` subtracted from each
-    /// element of `self`.
-    fn sub_scalar(&self, scalar: f32) -> Matrix<M, N> {
-        let mut res = self.clone();
-
-        for i in 0..M {
-            for j in 0..N {
-                *res.index_mut(i, j) = self.index(i, j) - scalar;
-            }
-        }
-
-        res
-    }
-
-    /// Subtracts the `scalar` from each element of `self` inplace.
-    fn sub_scalar_inplace(mut self, scalar: f32) -> Matrix<M, N> {
-        for i in 0..M {
-            for j in 0..N {
-                *self.index_mut(i, j) = self.index(i, j) - scalar;
-            }
-        }
-
-        self
-    }
-
-    /// Returns a new matrix that has the each element subtracted from the
-    /// `scalar`.
-    fn scalar_sub(&self, scalar: f32) -> Matrix<M, N> {
-        let mut res = self.clone();
-
-        for i in 0..M {
-            for j in 0..N {
-                *res.index_mut(i, j) = scalar - self.index(i, j);
-            }
-        }
-
-        res
-    }
-
-    /// Subtracts each element of `self` from `scalar` inplace.
-    fn scalar_sub_inplace(mut self, scalar: f32) -> Matrix<M, N> {
-        for i in 0..M {
-            for j in 0..N {
-                *self.index_mut(i, j) = scalar - self.index(i, j);
-            }
-        }
-
-        self
-    }
-
-    /// Computes the transpose of the matrix.
-    fn transpose(&self) -> Matrix<N, M> {
-        let mut tranposed = Matrix::<N, M>::from_vec(vec![0.0; M * N]);
-
-        for i in 0..N {
-            for j in 0..M {
-                *tranposed.index_mut(i, j) = *self.index(j, i);
-            }
-        }
-
-        tranposed
-    }
-
-    /// Calculates the norm of `self`.
-    fn norm(&self) -> f32 {
-        let mut sums = [0.0; N];
-        for col in 0..N {
-            for row in 0..M {
-                sums[col] += self.col(col)[row];
-            }
-        }
-        sums.sort_by(|a, b| f32::partial_cmp(b, a).unwrap());
-        sums[0]
-    }
-
-    /// Returns a matrix that is `1.0` for any element of `self` that is
-    /// positive, and `-1.0` for any negative element.
-    fn signs(&self) -> Self {
-        let mut signs = vec![-1.0; M * N];
-
-        for row in 0..M {
-            for col in 0..N {
-                if *self.index(row, col) >= 0.0 {
-                    signs[self.get_index(row, col)] = 1.0;
-                }
-            }
-        }
-
-        Self::from_vec(signs)
-    }
-
-    /// Returns the QR-factorization of the matrix using the Householder method.
-    fn qr_factorization(&self) -> (Matrix<M, N>, Matrix<M, N>) {
-        let mut q = {
-            let mut q = Matrix::<M, N>::default();
-            for i in 0..M {
-                for j in 0..M {
-                    if i == j {
-                        *q.index_mut(i, j) = 1.0;
-                    }
-                }
-            }
-            q
-        };
-        let mut r = self.clone();
-        let signs = r.signs();
-
-        for j in 0..N {
-            let normx = Matrix::<M, 1>::from_col(&r.col(j)).norm();
-            let s = -1.0 * signs.index(j, j);
-            let u1 = r.index(j, j) - s * normx;
-            let r_col = &mut r.col(j);
-            let q_row = &mut q.row(j);
-            let mut w = Matrix::<M, 1>::from_col(r_col).scale_inplace(1.0 / u1);
-            *w.index_mut(0, j) = 1.0;
-            let tau = -s * u1 / normx;
-
-            for i in 0..M {
-                let combined_terms = {
-                    let term1 = w.scale(tau);
-                    let term2 = w.transpose().scale(r_col[i]);
-                    term1.mul(&term2)
-                };
-                r_col[i] = *combined_terms.scalar_sub(r_col[i]).index(i, j);
-
-                let combined_terms = {
-                    let term1 = w.scale(q_row[i]);
-                    let term2 = w.scale(tau).transpose();
-                    term1.mul(&term2)
-                };
-                q_row[i] = *combined_terms.scalar_sub(q_row[i]).index(i, j);
-            }
-        }
-        (q, r)
-    }
-
-    // TODO: Have different types for square, rectangle, triangle, row, col
-    // matrices
-    //
-    // Returns the new matrix that is the inverse of `self`.
-    fn inverse(&self) -> Self {
-        let (q, r) = self.qr_factorization();
-
-        let x = r.inverse().mul::<M>(&q.transpose());
-
-        todo!()
-    }
-
-    fn inverse_inplace(mut self) -> Self {
-        todo!()
-    }
-}
-
-impl<const N: usize> Matrix<1, N> {
-    /// Creates a 1xP matrix with values from `start` to `end` spaced linearly.
-    fn linspace(start: f32, end: f32) -> Self {
-        let h = (end - start) / (N - 1) as f32;
-        let mut v = vec![0.0; N];
-        v[0] = start;
-        (1..N).for_each(|i| {
-            v[i] = v[i - 1] + h;
-        });
-
-        let data = {
-            let mut v = mem::ManuallyDrop::new(v);
-            let data = v.as_mut_ptr();
-            NonNull::new(data).unwrap()
+            let mut elems = ManuallyDrop::new(vec![T::default(); M * N]);
+            NonNull::new(elems.as_mut_ptr()).unwrap()
         };
 
         Self { data }
     }
 }
 
-impl<const M: usize, const N: usize> Default for Matrix<M, N> {
-    /// Creates a `M x N` matrix filled with zeros.
-    fn default() -> Self {
-        Self::zeros()
+impl<const M: usize, const N: usize, T> Matrix<M, N, T> {
+    fn row(&self, index: usize) -> MatrixResult<MatrixView<T, Row>> {
+        if index >= M {
+            return Err(MatrixError::IndexOutOfBounds(format!(
+                "The row index cannot be greater than or equal to {}",
+                M
+            )));
+        }
+
+        Ok(MatrixView::<T, Row> {
+            data: self.data.clone(),
+            start_row: index,
+            start_col: 0,
+            dimension: Dimension { rows: 1, cols: N },
+            _marker: PhantomData,
+        })
+    }
+
+    fn col(&self, index: usize) -> MatrixResult<MatrixView<T, Col>> {
+        if index >= N {
+            return Err(MatrixError::IndexOutOfBounds(format!(
+                "The column index cannot be greater than or equal to {}",
+                N
+            )));
+        }
+
+        Ok(MatrixView::<T, Col> {
+            data: self.data.clone(),
+            start_row: 0,
+            start_col: index,
+            dimension: Dimension { rows: M, cols: 1 },
+            _marker: PhantomData,
+        })
     }
 }
 
-impl<const M: usize, const N: usize> Drop for Matrix<M, N> {
-    /// Releases the memory used by the matrix.
+impl<const M: usize, const N: usize, T> Drop for Matrix<M, N, T> {
     fn drop(&mut self) {
         unsafe {
-            Vec::from_raw_parts(self.data.as_ptr(), M * N, M * N);
+            Vec::from_raw_parts(self.data.as_mut(), M * N, M * N);
         }
     }
 }
 
-impl<const M: usize, const N: usize> Clone for Matrix<M, N> {
-    /// Clones the matrix into a new one by copying each element.
-    fn clone(&self) -> Self {
-        let mut data = vec![0.0; M * N];
-        for row in 0..M {
-            for col in 0..N {
-                data[self.get_index(row, col)] = *self.index(row, col);
-            }
-        }
-
-        Self::from_vec(data)
-    }
-}
-
-impl<const M: usize, const N: usize> fmt::Debug for Matrix<M, N> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!("Matrix<{}, {}> [\n", M, N))?;
-        for i in 0..M {
-            f.write_fmt(format_args!("\t{:?}\n", self.row(i)))?;
-        }
-        write!(f, "{}", format_args!("]"))
+impl<const M: usize, const N: usize, T> fmt::Debug for Matrix<M, N, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", format_args!("Matrix ({} x {}) [\n", M, N))?;
+        todo!()
     }
 }
 
@@ -613,82 +194,7 @@ mod tests {
 
     #[test]
     fn can_init() {
-        let _mat = Matrix::<3, 2>::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
-        // dbg!(mat);
-
-        let _eye = Matrix::<6, 6>::identity();
-        // dbg!(eye);
-
-        let _lin: Matrix<1, 5> = Matrix::linspace(1.0, 10.0);
-        // dbg!(lin);
-
-        let _zeros: Matrix<2, 5> = Matrix::default();
-        // dbg!(zeros);
-    }
-
-    #[test]
-    fn can_index() {
-        const M: usize = 2;
-        const N: usize = 3;
-        let vec = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
-        let mat = Matrix::<M, N>::from_vec(vec.clone());
-
-        for row in 0..M {
-            for col in 0..N {
-                assert_eq!(*mat.index(row, col), vec[mat.get_index(row, col)])
-            }
-        }
-
-        let row0 = mat.row(0);
-        assert_eq!(row0[0], vec[0]);
-
-        let col0 = mat.col(0);
-        assert_eq!(col0[1], vec[3]);
-    }
-
-    #[test]
-    fn can_scale() {
-        const M: usize = 2;
-        const N: usize = 3;
-        let vec = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
-        let mut mat = Matrix::<M, N>::from_vec(vec.clone());
-        assert_eq!(mat.as_slice(), vec);
-
-        let scaled = mat.scale(2.0);
-        assert_eq!(
-            scaled.as_slice(),
-            vec.iter().map(|x| x * 2.0).collect::<Vec<_>>()
-        );
-
-        mat = mat.scale_inplace(2.0);
-        assert_eq!(mat.as_slice(), scaled.as_slice());
-    }
-
-    #[test]
-    fn can_mul() {
-        let a = Matrix::<2, 3>::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
-        let b = Matrix::<3, 2>::from_vec(vec![7.0, 8.0, 9.0, 10.0, 11.0, 12.0]);
-
-        let c = a.mul(&b);
-        assert_eq!(c.row(0)[0], 58.0);
-        assert_eq!(c.row(0)[1], 64.0);
-        assert_eq!(c.row(1)[0], 139.0);
-        assert_eq!(c.row(1)[1], 154.0);
-
-        let a = Matrix::<2, 2>::from_vec(vec![1.0, 2.0, 3.0, 4.0]);
-        let b = Matrix::<2, 2>::from_vec(vec![5.0, 6.0, 7.0, 8.0]);
-
-        let c = a.mul(&b);
-        assert_eq!(c.row(0)[0], 19.0);
-        assert_eq!(c.row(0)[1], 22.0);
-        assert_eq!(c.row(1)[0], 43.0);
-        assert_eq!(c.row(1)[1], 50.0);
-    }
-
-    #[test]
-    fn can_inverse() {
-        let mat = Matrix::<2, 2>::from_vec(vec![4., 7., 2., 6.]);
-        dbg!(&mat);
-        dbg!(&mat.inverse());
+        let mat: Matrix<2, 2> = Matrix::new();
+        dbg!(mat);
     }
 }
