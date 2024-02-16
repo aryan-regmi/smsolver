@@ -13,6 +13,9 @@ use thiserror::Error;
 enum MatrixError {
     #[error("InvalidIndex: {0}")]
     IndexOutOfBounds(String),
+
+    #[error("InvalidShape: {0}")]
+    InvalidShape(String),
 }
 
 type MatrixResult<T> = Result<T, MatrixError>;
@@ -23,30 +26,21 @@ struct Dimension {
     cols: usize,
 }
 
-trait ViewType {}
-struct Row;
-impl ViewType for Row {}
-struct Col;
-impl ViewType for Col {}
-struct Mat;
-impl ViewType for Mat {}
-
-// TODO: Remove ViewType, imitate Matrix instead MatrixView<M,N,T>
-//
 /// An immutable view into a matrix.
 ///
 /// ## Note
-/// All operations on a `MatrixView` will create and return new matricies. If in-place operations
-/// are required, then they should be done on the raw `Matrix` itself.
+/// All operations on a `MatrixView` will create and return new matricies. If
+/// in-place operations are required, then they should be done on a
+/// `MatrixViewMut` instead.
 #[derive(Clone, Copy)]
-struct MatrixView<T> {
-    data: NonNull<T>,
+struct MatrixView<'a, T> {
+    data: &'a NonNull<T>,
     start_row: usize,
     start_col: usize,
     dimension: Dimension,
 }
 
-impl<T> Index<(usize, usize)> for MatrixView<T> {
+impl<'a, T> Index<(usize, usize)> for MatrixView<'a, T> {
     type Output = T;
 
     fn index(&self, index: (usize, usize)) -> &Self::Output {
@@ -84,6 +78,92 @@ impl<T> Index<(usize, usize)> for MatrixView<T> {
     }
 }
 
+/// A mutable view into a matrix.
+///
+/// ## Note
+/// All operations on a `MatrixViewMut` are done in-place; use `MatrixView` if
+/// the original matrix should remain unchanged.
+struct MatrixViewMut<'a, T> {
+    data: &'a mut NonNull<T>,
+    start_row: usize,
+    start_col: usize,
+    dimension: Dimension,
+}
+
+impl<'a, T> Index<(usize, usize)> for MatrixViewMut<'a, T> {
+    type Output = T;
+
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        let num_rows = self.dimension.rows;
+        let num_cols = self.dimension.cols;
+        if index.0 >= num_rows {
+            panic!(
+                "{}",
+                MatrixError::IndexOutOfBounds(format!(
+                    "The row index must be less than {}",
+                    num_rows
+                ))
+                .to_string()
+            );
+        } else if index.1 >= num_cols {
+            panic!(
+                "{}",
+                MatrixError::IndexOutOfBounds(format!(
+                    "The column index must be less than {}",
+                    num_cols
+                ))
+                .to_string()
+            );
+        }
+
+        unsafe {
+            let row = index.0 + self.start_row;
+            let col = index.1 + self.start_col;
+            self.data
+                .as_ptr()
+                .add(num_cols * row + col)
+                .as_ref()
+                .unwrap()
+        }
+    }
+}
+
+impl<'a, T> IndexMut<(usize, usize)> for MatrixViewMut<'a, T> {
+    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+        let num_rows = self.dimension.rows;
+        let num_cols = self.dimension.cols;
+        if index.0 >= num_rows {
+            panic!(
+                "{}",
+                MatrixError::IndexOutOfBounds(format!(
+                    "The row index must be less than {}",
+                    num_rows
+                ))
+                .to_string()
+            );
+        } else if index.1 >= num_cols {
+            panic!(
+                "{}",
+                MatrixError::IndexOutOfBounds(format!(
+                    "The column index must be less than {}",
+                    num_cols
+                ))
+                .to_string()
+            );
+        }
+
+        unsafe {
+            let row = index.0 + self.start_row;
+            let col = index.1 + self.start_col;
+            self.data
+                .as_ptr()
+                .add(num_cols * row + col)
+                .as_mut()
+                .unwrap()
+        }
+    }
+}
+
 /// A `M x N` matrix containing elements of type `T`.
 ///
 /// ## Note
@@ -113,7 +193,7 @@ impl<const M: usize, const N: usize, T> Matrix<M, N, T> {
         M == N
     }
 
-    fn row(&self, index: usize) -> MatrixResult<MatrixView<T>> {
+    fn row<'a>(&'a self, index: usize) -> MatrixResult<MatrixView<'a, T>> {
         if index >= M {
             return Err(MatrixError::IndexOutOfBounds(format!(
                 "The row index cannot be greater than or equal to {}",
@@ -122,14 +202,14 @@ impl<const M: usize, const N: usize, T> Matrix<M, N, T> {
         }
 
         Ok(MatrixView {
-            data: self.data.clone(),
+            data: &self.data,
             start_row: index,
             start_col: 0,
             dimension: Dimension { rows: 1, cols: N },
         })
     }
 
-    fn col(&self, index: usize) -> MatrixResult<MatrixView<T>> {
+    fn col<'a>(&'a self, index: usize) -> MatrixResult<MatrixView<'a, T>> {
         if index >= N {
             return Err(MatrixError::IndexOutOfBounds(format!(
                 "The column index cannot be greater than or equal to {}",
@@ -138,31 +218,75 @@ impl<const M: usize, const N: usize, T> Matrix<M, N, T> {
         }
 
         Ok(MatrixView {
-            data: self.data.clone(),
+            data: &self.data,
             start_row: 0,
             start_col: index,
             dimension: Dimension { rows: M, cols: 1 },
         })
     }
 
-    fn view(
-        &self,
+    fn view<'a>(
+        &'a self,
         start_row: usize,
         start_col: usize,
         dimension: Dimension,
-    ) -> MatrixResult<MatrixView<T>> {
-        // FIXME: Write error messages
+    ) -> MatrixResult<MatrixView<'a, T>> {
         if start_row >= M {
-            panic!()
+            return Err(MatrixError::IndexOutOfBounds(format!(
+                "The start row must be less than {}",
+                M
+            )));
         } else if start_col >= N {
-            panic!()
+            return Err(MatrixError::IndexOutOfBounds(format!(
+                "The start col must be less than {}",
+                N
+            )));
         } else if dimension.rows > M {
-            panic!()
+            return Err(MatrixError::InvalidShape(
+                "The view cannot have more rows than `self".into(),
+            ));
         } else if dimension.cols > N {
+            return Err(MatrixError::InvalidShape(
+                "The view cannot have more columns than `self".into(),
+            ));
         }
 
         Ok(MatrixView {
-            data: self.data.clone(),
+            data: &self.data,
+            start_row,
+            start_col,
+            dimension,
+        })
+    }
+
+    fn view_mut<'a>(
+        &'a mut self,
+        start_row: usize,
+        start_col: usize,
+        dimension: Dimension,
+    ) -> MatrixResult<MatrixViewMut<'a, T>> {
+        if start_row >= M {
+            return Err(MatrixError::IndexOutOfBounds(format!(
+                "The start row must be less than {}",
+                M
+            )));
+        } else if start_col >= N {
+            return Err(MatrixError::IndexOutOfBounds(format!(
+                "The start col must be less than {}",
+                N
+            )));
+        } else if dimension.rows > M {
+            return Err(MatrixError::InvalidShape(
+                "The view cannot have more rows than `self".into(),
+            ));
+        } else if dimension.cols > N {
+            return Err(MatrixError::InvalidShape(
+                "The view cannot have more columns than `self".into(),
+            ));
+        }
+
+        Ok(MatrixViewMut {
+            data: &mut self.data,
             start_row,
             start_col,
             dimension,
@@ -208,32 +332,6 @@ impl<const M: usize, const N: usize, T> Index<(usize, usize)> for Matrix<M, N, T
                 .as_ptr()
                 .add(N * index.0 + index.1)
                 .as_ref()
-                .unwrap()
-        }
-    }
-}
-
-impl<const M: usize, const N: usize, T> IndexMut<(usize, usize)> for Matrix<M, N, T> {
-    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
-        if index.0 >= M {
-            panic!(
-                "{}",
-                MatrixError::IndexOutOfBounds(format!("The row index must be less than {}", M))
-                    .to_string()
-            );
-        } else if index.1 >= N {
-            panic!(
-                "{}",
-                MatrixError::IndexOutOfBounds(format!("The column index must be less than {}", N))
-                    .to_string()
-            );
-        }
-
-        unsafe {
-            self.data
-                .as_ptr()
-                .add(N * index.0 + index.1)
-                .as_mut()
                 .unwrap()
         }
     }
