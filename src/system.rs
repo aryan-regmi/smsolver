@@ -1,6 +1,6 @@
 use crate::units;
 
-// TODO: Create new type for matrix: Matrix<Dimension>
+// FIXME: Replace with crate::matrix::Matrix
 type Matrix = Vec<Vec<f32>>;
 
 /// A position in 2D.
@@ -232,24 +232,6 @@ impl System {
         }
 
         Ok(vec![fx, fy, moment])
-    }
-
-    // TODO: Move to matrix
-    //
-    /// Calculates the QR factorization of the matrix using the Householder alogrithm.
-    fn qr_factorization(mat: Matrix) -> (Matrix, Matrix) {
-        todo!()
-    }
-
-    // TODO: Move to matrix & generalize the type (i.e square, rect, triangle, etc)
-    //
-    /// Calculates the inverse of the matrix.
-    fn matrix_inverse(mat: Matrix) -> Matrix {
-        let (q, r) = System::qr_factorization(mat);
-
-        // TODO: inv(mat) = inv(r).mul(q.transpose())
-
-        todo!()
     }
 
     /// Solves `Ax = b` for x (x = inverse[A]b).
