@@ -2,7 +2,7 @@ use std::{
     alloc::{self, Layout},
     fmt,
     mem::ManuallyDrop,
-    ops::{Index, IndexMut, Mul},
+    ops::{Div, Index, IndexMut, Mul},
     ptr::NonNull,
     usize,
 };
@@ -190,6 +190,40 @@ impl<'a> Mul<&MatrixView<'a, f32>> for f32 {
     }
 }
 
+impl<'a> Div<f32> for MatrixView<'a, f32> {
+    type Output = Matrix<f32>;
+
+    fn div(self, rhs: f32) -> Self::Output {
+        let mut mat =
+            Matrix::<f32>::new((self.dimension.num_rows, self.dimension.num_cols)).unwrap();
+        let mut view = mat.view_mut(0, 0, self.dimension).unwrap();
+        for i in 0..self.dimension.num_rows {
+            for j in 0..self.dimension.num_cols {
+                view[(i, j)] = self[(i, j)] / rhs;
+            }
+        }
+
+        mat
+    }
+}
+
+impl<'a> Div<f32> for &MatrixView<'a, f32> {
+    type Output = Matrix<f32>;
+
+    fn div(self, rhs: f32) -> Self::Output {
+        let mut mat =
+            Matrix::<f32>::new((self.dimension.num_rows, self.dimension.num_cols)).unwrap();
+        let mut view = mat.view_mut(0, 0, self.dimension).unwrap();
+        for i in 0..self.dimension.num_rows {
+            for j in 0..self.dimension.num_cols {
+                view[(i, j)] = self[(i, j)] / rhs;
+            }
+        }
+
+        mat
+    }
+}
+
 impl<'a, T: fmt::Debug> fmt::Debug for MatrixView<'a, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let m = self.dimension.num_rows;
@@ -355,6 +389,34 @@ impl<'a> Mul<&mut MatrixViewMut<'a, f32>> for f32 {
         }
 
         rhs.clone()
+    }
+}
+
+impl<'a> Div<f32> for MatrixViewMut<'a, f32> {
+    type Output = MatrixViewMut<'a, f32>;
+
+    fn div(mut self, rhs: f32) -> Self::Output {
+        for i in 0..self.dimension.num_rows {
+            for j in 0..self.dimension.num_cols {
+                self[(i, j)] /= rhs;
+            }
+        }
+
+        self
+    }
+}
+
+impl<'a> Div<f32> for &mut MatrixViewMut<'a, f32> {
+    type Output = MatrixViewMut<'a, f32>;
+
+    fn div(self, rhs: f32) -> Self::Output {
+        for i in 0..self.dimension.num_rows {
+            for j in 0..self.dimension.num_cols {
+                self[(i, j)] /= rhs;
+            }
+        }
+
+        self.clone()
     }
 }
 
@@ -713,6 +775,33 @@ mod tests {
 
     #[test]
     fn can_mul() -> MatrixResult<()> {
+        let mut mat = Matrix::from_vec(vec![1.0, 2.0, 3.0, 4.0], (2, 2).into())?;
+        {
+            let new_mat = 3.0 * mat.clone() * 1.0;
+            for i in 0..2 {
+                for j in 0..2 {
+                    assert_eq!(new_mat[(i, j)], 3.0 * mat[(i, j)]);
+                }
+            }
+        }
+
+        // Inplace
+        {
+            let mat_view = 1.0 * mat.view_self_mut() * 3.0;
+
+            let v = vec![3., 6., 9., 12.];
+            for i in 0..2 {
+                for j in 0..2 {
+                    assert_eq!(mat_view[(i, j)], v[i * 2 + j]);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn can_div() -> MatrixResult<()> {
         let mut mat = Matrix::from_vec(vec![1.0, 2.0, 3.0, 4.0], (2, 2).into())?;
         {
             let new_mat = 3.0 * mat.clone() * 1.0;
