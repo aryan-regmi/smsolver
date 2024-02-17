@@ -727,6 +727,22 @@ impl<'a> Mul<Matrix<f32>> for f32 {
     }
 }
 
+impl<'a> Div<f32> for &Matrix<f32> {
+    type Output = Matrix<f32>;
+
+    fn div(self, rhs: f32) -> Self::Output {
+        self.view(0, 0, self.size).unwrap() / rhs
+    }
+}
+
+impl<'a> Div<f32> for Matrix<f32> {
+    type Output = Matrix<f32>;
+
+    fn div(self, rhs: f32) -> Self::Output {
+        self.view(0, 0, self.size).unwrap() / rhs
+    }
+}
+
 impl<T: fmt::Debug> fmt::Debug for Matrix<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let m = self.size.num_rows;
@@ -804,19 +820,19 @@ mod tests {
     fn can_div() -> MatrixResult<()> {
         let mut mat = Matrix::from_vec(vec![1.0, 2.0, 3.0, 4.0], (2, 2).into())?;
         {
-            let new_mat = 3.0 * mat.clone() * 1.0;
+            let new_mat = mat.clone() / 3.0;
             for i in 0..2 {
                 for j in 0..2 {
-                    assert_eq!(new_mat[(i, j)], 3.0 * mat[(i, j)]);
+                    assert_eq!(new_mat[(i, j)], (1.0 / 3.0) * mat[(i, j)]);
                 }
             }
         }
 
         // Inplace
         {
-            let mat_view = 1.0 * mat.view_self_mut() * 3.0;
+            let mat_view = mat.view_self_mut() / 3.0;
 
-            let v = vec![3., 6., 9., 12.];
+            let v = vec![(1. / 3.), (2. / 3.), 1.0, (4. / 3.)];
             for i in 0..2 {
                 for j in 0..2 {
                     assert_eq!(mat_view[(i, j)], v[i * 2 + j]);
