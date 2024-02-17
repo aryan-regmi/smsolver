@@ -2,7 +2,7 @@ use std::{
     alloc::{self, Layout},
     fmt,
     mem::ManuallyDrop,
-    ops::{Div, Index, IndexMut, Mul},
+    ops::{Add, Div, Index, IndexMut, Mul, Sub},
     ptr::NonNull,
     usize,
 };
@@ -147,12 +147,140 @@ impl<'a, T> Index<(usize, usize)> for MatrixView<'a, T> {
     }
 }
 
+impl<'a> Add<f32> for MatrixView<'a, f32> {
+    type Output = Matrix<f32>;
+
+    fn add(self, rhs: f32) -> Self::Output {
+        let mut mat = Matrix::<f32>::new((self.dimension.rows, self.dimension.cols));
+        let mut view = mat.view_mut(0, 0, self.dimension);
+        for i in 0..self.dimension.rows {
+            for j in 0..self.dimension.cols {
+                view[(i, j)] = self[(i, j)] + rhs;
+            }
+        }
+
+        mat
+    }
+}
+
+impl<'a> Add<MatrixView<'a, f32>> for f32 {
+    type Output = Matrix<f32>;
+
+    fn add(self, rhs: MatrixView<'a, f32>) -> Self::Output {
+        let mut mat = Matrix::<f32>::new((rhs.dimension.rows, rhs.dimension.cols));
+        let mut view = mat.view_mut(0, 0, rhs.dimension);
+        for i in 0..rhs.dimension.rows {
+            for j in 0..rhs.dimension.cols {
+                view[(i, j)] = rhs[(i, j)] + self;
+            }
+        }
+
+        mat
+    }
+}
+
+impl<'a> Add<f32> for &MatrixView<'a, f32> {
+    type Output = Matrix<f32>;
+
+    fn add(self, rhs: f32) -> Self::Output {
+        let mut mat = Matrix::<f32>::new((self.dimension.rows, self.dimension.cols));
+        let mut view = mat.view_mut(0, 0, self.dimension);
+        for i in 0..self.dimension.rows {
+            for j in 0..self.dimension.cols {
+                view[(i, j)] = self[(i, j)] + rhs;
+            }
+        }
+
+        mat
+    }
+}
+
+impl<'a> Add<&MatrixView<'a, f32>> for f32 {
+    type Output = Matrix<f32>;
+
+    fn add(self, rhs: &MatrixView<'a, f32>) -> Self::Output {
+        let mut mat = Matrix::<f32>::new((rhs.dimension.rows, rhs.dimension.cols));
+        let mut view = mat.view_mut(0, 0, rhs.dimension);
+        for i in 0..rhs.dimension.rows {
+            for j in 0..rhs.dimension.cols {
+                view[(i, j)] = rhs[(i, j)] + self;
+            }
+        }
+
+        mat
+    }
+}
+
+impl<'a> Sub<f32> for MatrixView<'a, f32> {
+    type Output = Matrix<f32>;
+
+    fn sub(self, rhs: f32) -> Self::Output {
+        let mut mat = Matrix::<f32>::new((self.dimension.rows, self.dimension.cols));
+        let mut view = mat.view_mut(0, 0, self.dimension);
+        for i in 0..self.dimension.rows {
+            for j in 0..self.dimension.cols {
+                view[(i, j)] = self[(i, j)] - rhs;
+            }
+        }
+
+        mat
+    }
+}
+
+impl<'a> Sub<MatrixView<'a, f32>> for f32 {
+    type Output = Matrix<f32>;
+
+    fn sub(self, rhs: MatrixView<'a, f32>) -> Self::Output {
+        let mut mat = Matrix::<f32>::new((rhs.dimension.rows, rhs.dimension.cols));
+        let mut view = mat.view_mut(0, 0, rhs.dimension);
+        for i in 0..rhs.dimension.rows {
+            for j in 0..rhs.dimension.cols {
+                view[(i, j)] = self - rhs[(i, j)];
+            }
+        }
+
+        mat
+    }
+}
+
+impl<'a> Sub<f32> for &MatrixView<'a, f32> {
+    type Output = Matrix<f32>;
+
+    fn sub(self, rhs: f32) -> Self::Output {
+        let mut mat = Matrix::<f32>::new((self.dimension.rows, self.dimension.cols));
+        let mut view = mat.view_mut(0, 0, self.dimension);
+        for i in 0..self.dimension.rows {
+            for j in 0..self.dimension.cols {
+                view[(i, j)] = self[(i, j)] - rhs;
+            }
+        }
+
+        mat
+    }
+}
+
+impl<'a> Sub<&MatrixView<'a, f32>> for f32 {
+    type Output = Matrix<f32>;
+
+    fn sub(self, rhs: &MatrixView<'a, f32>) -> Self::Output {
+        let mut mat = Matrix::<f32>::new((rhs.dimension.rows, rhs.dimension.cols));
+        let mut view = mat.view_mut(0, 0, rhs.dimension);
+        for i in 0..rhs.dimension.rows {
+            for j in 0..rhs.dimension.cols {
+                view[(i, j)] = self - rhs[(i, j)];
+            }
+        }
+
+        mat
+    }
+}
+
 impl<'a> Mul<f32> for MatrixView<'a, f32> {
     type Output = Matrix<f32>;
 
     fn mul(self, rhs: f32) -> Self::Output {
         let mut mat = Matrix::<f32>::new((self.dimension.rows, self.dimension.cols));
-        let mut view = mat.view_mut(0, 0, self.dimension).unwrap();
+        let mut view = mat.view_mut(0, 0, self.dimension);
         for i in 0..self.dimension.rows {
             for j in 0..self.dimension.cols {
                 view[(i, j)] = self[(i, j)] * rhs;
@@ -168,7 +296,7 @@ impl<'a> Mul<MatrixView<'a, f32>> for f32 {
 
     fn mul(self, rhs: MatrixView<'a, f32>) -> Self::Output {
         let mut mat = Matrix::<f32>::new((rhs.dimension.rows, rhs.dimension.cols));
-        let mut view = mat.view_mut(0, 0, rhs.dimension).unwrap();
+        let mut view = mat.view_mut(0, 0, rhs.dimension);
         for i in 0..rhs.dimension.rows {
             for j in 0..rhs.dimension.cols {
                 view[(i, j)] = rhs[(i, j)] * self;
@@ -184,7 +312,7 @@ impl<'a> Mul<f32> for &MatrixView<'a, f32> {
 
     fn mul(self, rhs: f32) -> Self::Output {
         let mut mat = Matrix::<f32>::new((self.dimension.rows, self.dimension.cols));
-        let mut view = mat.view_mut(0, 0, self.dimension).unwrap();
+        let mut view = mat.view_mut(0, 0, self.dimension);
         for i in 0..self.dimension.rows {
             for j in 0..self.dimension.cols {
                 view[(i, j)] = self[(i, j)] * rhs;
@@ -200,7 +328,7 @@ impl<'a> Mul<&MatrixView<'a, f32>> for f32 {
 
     fn mul(self, rhs: &MatrixView<'a, f32>) -> Self::Output {
         let mut mat = Matrix::<f32>::new((rhs.dimension.rows, rhs.dimension.cols));
-        let mut view = mat.view_mut(0, 0, rhs.dimension).unwrap();
+        let mut view = mat.view_mut(0, 0, rhs.dimension);
         for i in 0..rhs.dimension.rows {
             for j in 0..rhs.dimension.cols {
                 view[(i, j)] = rhs[(i, j)] * self;
@@ -216,7 +344,7 @@ impl<'a> Div<f32> for MatrixView<'a, f32> {
 
     fn div(self, rhs: f32) -> Self::Output {
         let mut mat = Matrix::<f32>::new((self.dimension.rows, self.dimension.cols));
-        let mut view = mat.view_mut(0, 0, self.dimension).unwrap();
+        let mut view = mat.view_mut(0, 0, self.dimension);
         for i in 0..self.dimension.rows {
             for j in 0..self.dimension.cols {
                 view[(i, j)] = self[(i, j)] / rhs;
@@ -232,7 +360,7 @@ impl<'a> Div<f32> for &MatrixView<'a, f32> {
 
     fn div(self, rhs: f32) -> Self::Output {
         let mut mat = Matrix::<f32>::new((self.dimension.rows, self.dimension.cols));
-        let mut view = mat.view_mut(0, 0, self.dimension).unwrap();
+        let mut view = mat.view_mut(0, 0, self.dimension);
         for i in 0..self.dimension.rows {
             for j in 0..self.dimension.cols {
                 view[(i, j)] = self[(i, j)] / rhs;
@@ -355,6 +483,134 @@ impl<'a, T> IndexMut<(usize, usize)> for MatrixViewMut<'a, T> {
                 .as_mut()
                 .unwrap()
         }
+    }
+}
+
+impl<'a> Add<f32> for MatrixViewMut<'a, f32> {
+    type Output = Matrix<f32>;
+
+    fn add(self, rhs: f32) -> Self::Output {
+        let mut mat = Matrix::<f32>::new((self.dimension.rows, self.dimension.cols));
+        let mut view = mat.view_mut(0, 0, self.dimension);
+        for i in 0..self.dimension.rows {
+            for j in 0..self.dimension.cols {
+                view[(i, j)] = self[(i, j)] + rhs;
+            }
+        }
+
+        mat
+    }
+}
+
+impl<'a> Add<MatrixViewMut<'a, f32>> for f32 {
+    type Output = Matrix<f32>;
+
+    fn add(self, rhs: MatrixViewMut<'a, f32>) -> Self::Output {
+        let mut mat = Matrix::<f32>::new((rhs.dimension.rows, rhs.dimension.cols));
+        let mut view = mat.view_mut(0, 0, rhs.dimension);
+        for i in 0..rhs.dimension.rows {
+            for j in 0..rhs.dimension.cols {
+                view[(i, j)] = rhs[(i, j)] + self;
+            }
+        }
+
+        mat
+    }
+}
+
+impl<'a> Add<f32> for &MatrixViewMut<'a, f32> {
+    type Output = Matrix<f32>;
+
+    fn add(self, rhs: f32) -> Self::Output {
+        let mut mat = Matrix::<f32>::new((self.dimension.rows, self.dimension.cols));
+        let mut view = mat.view_mut(0, 0, self.dimension);
+        for i in 0..self.dimension.rows {
+            for j in 0..self.dimension.cols {
+                view[(i, j)] = self[(i, j)] + rhs;
+            }
+        }
+
+        mat
+    }
+}
+
+impl<'a> Add<&MatrixViewMut<'a, f32>> for f32 {
+    type Output = Matrix<f32>;
+
+    fn add(self, rhs: &MatrixViewMut<'a, f32>) -> Self::Output {
+        let mut mat = Matrix::<f32>::new((rhs.dimension.rows, rhs.dimension.cols));
+        let mut view = mat.view_mut(0, 0, rhs.dimension);
+        for i in 0..rhs.dimension.rows {
+            for j in 0..rhs.dimension.cols {
+                view[(i, j)] = rhs[(i, j)] + self;
+            }
+        }
+
+        mat
+    }
+}
+
+impl<'a> Sub<f32> for MatrixViewMut<'a, f32> {
+    type Output = Matrix<f32>;
+
+    fn sub(self, rhs: f32) -> Self::Output {
+        let mut mat = Matrix::<f32>::new((self.dimension.rows, self.dimension.cols));
+        let mut view = mat.view_mut(0, 0, self.dimension);
+        for i in 0..self.dimension.rows {
+            for j in 0..self.dimension.cols {
+                view[(i, j)] = self[(i, j)] - rhs;
+            }
+        }
+
+        mat
+    }
+}
+
+impl<'a> Sub<MatrixViewMut<'a, f32>> for f32 {
+    type Output = Matrix<f32>;
+
+    fn sub(self, rhs: MatrixViewMut<'a, f32>) -> Self::Output {
+        let mut mat = Matrix::<f32>::new((rhs.dimension.rows, rhs.dimension.cols));
+        let mut view = mat.view_mut(0, 0, rhs.dimension);
+        for i in 0..rhs.dimension.rows {
+            for j in 0..rhs.dimension.cols {
+                view[(i, j)] = self - rhs[(i, j)];
+            }
+        }
+
+        mat
+    }
+}
+
+impl<'a> Sub<f32> for &MatrixViewMut<'a, f32> {
+    type Output = Matrix<f32>;
+
+    fn sub(self, rhs: f32) -> Self::Output {
+        let mut mat = Matrix::<f32>::new((self.dimension.rows, self.dimension.cols));
+        let mut view = mat.view_mut(0, 0, self.dimension);
+        for i in 0..self.dimension.rows {
+            for j in 0..self.dimension.cols {
+                view[(i, j)] = self[(i, j)] - rhs;
+            }
+        }
+
+        mat
+    }
+}
+
+impl<'a> Sub<&MatrixViewMut<'a, f32>> for f32 {
+    type Output = Matrix<f32>;
+
+    fn sub(self, rhs: &MatrixViewMut<'a, f32>) -> Self::Output {
+        let mut mat = Matrix::<f32>::new((rhs.dimension.rows, rhs.dimension.cols));
+        let mut view = mat.view_mut(0, 0, rhs.dimension);
+        for i in 0..rhs.dimension.rows {
+            for j in 0..rhs.dimension.cols {
+                view[(i, j)] = self - rhs[(i, j)];
+            }
+        }
+
+        mat
     }
 }
 
@@ -780,11 +1036,75 @@ impl Clone for Matrix<f32> {
     }
 }
 
+impl<'a> Add<f32> for Matrix<f32> {
+    type Output = Matrix<f32>;
+
+    fn add(self, rhs: f32) -> Self::Output {
+        self.view_self() + rhs
+    }
+}
+
+impl<'a> Add<Matrix<f32>> for f32 {
+    type Output = Matrix<f32>;
+
+    fn add(self, rhs: Matrix<f32>) -> Self::Output {
+        rhs.view_self() + self
+    }
+}
+
+impl<'a> Add<f32> for &Matrix<f32> {
+    type Output = Matrix<f32>;
+
+    fn add(self, rhs: f32) -> Self::Output {
+        self.view_self() + rhs
+    }
+}
+
+impl<'a> Add<&Matrix<f32>> for f32 {
+    type Output = Matrix<f32>;
+
+    fn add(self, rhs: &Matrix<f32>) -> Self::Output {
+        rhs.view_self() + self
+    }
+}
+
+impl<'a> Sub<f32> for Matrix<f32> {
+    type Output = Matrix<f32>;
+
+    fn sub(self, rhs: f32) -> Self::Output {
+        self.view_self() - rhs
+    }
+}
+
+impl<'a> Sub<Matrix<f32>> for f32 {
+    type Output = Matrix<f32>;
+
+    fn sub(self, rhs: Matrix<f32>) -> Self::Output {
+        self - rhs.view_self()
+    }
+}
+
+impl<'a> Sub<f32> for &Matrix<f32> {
+    type Output = Matrix<f32>;
+
+    fn sub(self, rhs: f32) -> Self::Output {
+        self.view_self() - rhs
+    }
+}
+
+impl<'a> Sub<&Matrix<f32>> for f32 {
+    type Output = Matrix<f32>;
+
+    fn sub(self, rhs: &Matrix<f32>) -> Self::Output {
+        rhs.view_self() - self
+    }
+}
+
 impl<'a> Mul<f32> for &Matrix<f32> {
     type Output = Matrix<f32>;
 
     fn mul(self, rhs: f32) -> Self::Output {
-        self.view(0, 0, self.size).unwrap() * rhs
+        self.view(0, 0, self.size) * rhs
     }
 }
 
@@ -792,7 +1112,7 @@ impl<'a> Mul<&Matrix<f32>> for f32 {
     type Output = Matrix<f32>;
 
     fn mul(self, rhs: &Matrix<f32>) -> Self::Output {
-        self * rhs.view(0, 0, rhs.size).unwrap()
+        self * rhs.view(0, 0, rhs.size)
     }
 }
 
@@ -800,7 +1120,7 @@ impl<'a> Mul<f32> for Matrix<f32> {
     type Output = Matrix<f32>;
 
     fn mul(self, rhs: f32) -> Self::Output {
-        self.view(0, 0, self.size).unwrap() * rhs
+        self.view(0, 0, self.size) * rhs
     }
 }
 
@@ -808,7 +1128,7 @@ impl<'a> Mul<Matrix<f32>> for f32 {
     type Output = Matrix<f32>;
 
     fn mul(self, rhs: Matrix<f32>) -> Self::Output {
-        self * rhs.view(0, 0, rhs.size).unwrap()
+        self * rhs.view(0, 0, rhs.size)
     }
 }
 
@@ -816,7 +1136,7 @@ impl<'a> Div<f32> for &Matrix<f32> {
     type Output = Matrix<f32>;
 
     fn div(self, rhs: f32) -> Self::Output {
-        self.view(0, 0, self.size).unwrap() / rhs
+        self.view(0, 0, self.size) / rhs
     }
 }
 
@@ -824,7 +1144,7 @@ impl<'a> Div<f32> for Matrix<f32> {
     type Output = Matrix<f32>;
 
     fn div(self, rhs: f32) -> Self::Output {
-        self.view(0, 0, self.size).unwrap() / rhs
+        self.view(0, 0, self.size) / rhs
     }
 }
 
@@ -870,6 +1190,33 @@ mod tests {
             }
         }
         // dbg!(mat3);
+
+        Ok(())
+    }
+
+    #[test]
+    fn can_add() -> MatrixResult<()> {
+        let mut mat = Matrix::from_vec(vec![1.0, 2.0, 3.0, 4.0], (2, 2).into());
+        {
+            let new_mat = 3.0 * mat.clone() * 1.0;
+            for i in 0..2 {
+                for j in 0..2 {
+                    assert_eq!(new_mat[(i, j)], 3.0 * mat[(i, j)]);
+                }
+            }
+        }
+
+        // Inplace
+        {
+            let mat_view = 1.0 * mat.view_self_mut() * 3.0;
+
+            let v = vec![3., 6., 9., 12.];
+            for i in 0..2 {
+                for j in 0..2 {
+                    assert_eq!(mat_view[(i, j)], v[i * 2 + j]);
+                }
+            }
+        }
 
         Ok(())
     }
