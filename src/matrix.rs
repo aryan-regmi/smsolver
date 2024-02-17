@@ -8,6 +8,7 @@ use std::{
 };
 use thiserror::Error;
 
+/// Possible errors returned by matrix methods.
 #[derive(Debug, Error)]
 pub enum MatrixError {
     #[error("InvalidIndex: {0}")]
@@ -20,42 +21,52 @@ pub enum MatrixError {
     AllocationFailed,
 }
 
+/// Result type for convenience.
 pub type MatrixResult<T> = Result<T, MatrixError>;
 
+/// An interface for types that can be used as the dimensions of a `Matrix`.
 pub trait MatrixSize {
+    /// Gets the number of rows.
     fn num_rows(&self) -> usize;
+
+    /// Gets the number of columns.
     fn num_cols(&self) -> usize;
 }
 
+/// Represents a matrix's dimensions (number of rows and columns).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Dimension {
-    num_rows: usize,
-    num_cols: usize,
+    rows: usize,
+    cols: usize,
 }
 
 impl Dimension {
+    /// Creates a new `Dimension` from the given number of rows and columns.
     pub fn new(num_rows: usize, num_cols: usize) -> Self {
-        Self { num_rows, num_cols }
+        Self {
+            rows: num_rows,
+            cols: num_cols,
+        }
     }
 }
 
 impl MatrixSize for Dimension {
     #[inline]
     fn num_rows(&self) -> usize {
-        self.num_rows
+        self.rows
     }
 
     #[inline]
     fn num_cols(&self) -> usize {
-        self.num_cols
+        self.cols
     }
 }
 
 impl From<(usize, usize)> for Dimension {
     fn from(value: (usize, usize)) -> Self {
         Self {
-            num_rows: value.0,
-            num_cols: value.1,
+            rows: value.0,
+            cols: value.1,
         }
     }
 }
@@ -80,18 +91,31 @@ impl MatrixSize for (usize, usize) {
 /// `MatrixViewMut` instead.
 #[derive(Clone, Copy)]
 pub struct MatrixView<'a, T> {
+    /// An immutable reference to the underlying matrix's data.
     data: &'a NonNull<T>,
+
+    /// The row of the original matrix where this view starts at.
     start_row: usize,
+
+    /// The column of the original matrix where this view starts at.
     start_col: usize,
+
+    /// The dimensions of the view.
     dimension: Dimension,
+}
+
+impl<'a, T> MatrixView<'a, T> {
+    pub fn mul(&self, other: &Self) -> Matrix {
+        todo!()
+    }
 }
 
 impl<'a, T> Index<(usize, usize)> for MatrixView<'a, T> {
     type Output = T;
 
     fn index(&self, index: (usize, usize)) -> &Self::Output {
-        let num_rows = self.dimension.num_rows;
-        let num_cols = self.dimension.num_cols;
+        let num_rows = self.dimension.rows;
+        let num_cols = self.dimension.cols;
         if index.0 >= num_rows {
             panic!(
                 "{}",
@@ -99,7 +123,6 @@ impl<'a, T> Index<(usize, usize)> for MatrixView<'a, T> {
                     "The row index must be less than {}",
                     num_rows
                 ))
-                .to_string()
             );
         } else if index.1 >= num_cols {
             panic!(
@@ -128,11 +151,10 @@ impl<'a> Mul<f32> for MatrixView<'a, f32> {
     type Output = Matrix<f32>;
 
     fn mul(self, rhs: f32) -> Self::Output {
-        let mut mat =
-            Matrix::<f32>::new((self.dimension.num_rows, self.dimension.num_cols)).unwrap();
+        let mut mat = Matrix::<f32>::new((self.dimension.rows, self.dimension.cols));
         let mut view = mat.view_mut(0, 0, self.dimension).unwrap();
-        for i in 0..self.dimension.num_rows {
-            for j in 0..self.dimension.num_cols {
+        for i in 0..self.dimension.rows {
+            for j in 0..self.dimension.cols {
                 view[(i, j)] = self[(i, j)] * rhs;
             }
         }
@@ -145,10 +167,10 @@ impl<'a> Mul<MatrixView<'a, f32>> for f32 {
     type Output = Matrix<f32>;
 
     fn mul(self, rhs: MatrixView<'a, f32>) -> Self::Output {
-        let mut mat = Matrix::<f32>::new((rhs.dimension.num_rows, rhs.dimension.num_cols)).unwrap();
+        let mut mat = Matrix::<f32>::new((rhs.dimension.rows, rhs.dimension.cols));
         let mut view = mat.view_mut(0, 0, rhs.dimension).unwrap();
-        for i in 0..rhs.dimension.num_rows {
-            for j in 0..rhs.dimension.num_cols {
+        for i in 0..rhs.dimension.rows {
+            for j in 0..rhs.dimension.cols {
                 view[(i, j)] = rhs[(i, j)] * self;
             }
         }
@@ -161,11 +183,10 @@ impl<'a> Mul<f32> for &MatrixView<'a, f32> {
     type Output = Matrix<f32>;
 
     fn mul(self, rhs: f32) -> Self::Output {
-        let mut mat =
-            Matrix::<f32>::new((self.dimension.num_rows, self.dimension.num_cols)).unwrap();
+        let mut mat = Matrix::<f32>::new((self.dimension.rows, self.dimension.cols));
         let mut view = mat.view_mut(0, 0, self.dimension).unwrap();
-        for i in 0..self.dimension.num_rows {
-            for j in 0..self.dimension.num_cols {
+        for i in 0..self.dimension.rows {
+            for j in 0..self.dimension.cols {
                 view[(i, j)] = self[(i, j)] * rhs;
             }
         }
@@ -178,10 +199,10 @@ impl<'a> Mul<&MatrixView<'a, f32>> for f32 {
     type Output = Matrix<f32>;
 
     fn mul(self, rhs: &MatrixView<'a, f32>) -> Self::Output {
-        let mut mat = Matrix::<f32>::new((rhs.dimension.num_rows, rhs.dimension.num_cols)).unwrap();
+        let mut mat = Matrix::<f32>::new((rhs.dimension.rows, rhs.dimension.cols));
         let mut view = mat.view_mut(0, 0, rhs.dimension).unwrap();
-        for i in 0..rhs.dimension.num_rows {
-            for j in 0..rhs.dimension.num_cols {
+        for i in 0..rhs.dimension.rows {
+            for j in 0..rhs.dimension.cols {
                 view[(i, j)] = rhs[(i, j)] * self;
             }
         }
@@ -194,11 +215,10 @@ impl<'a> Div<f32> for MatrixView<'a, f32> {
     type Output = Matrix<f32>;
 
     fn div(self, rhs: f32) -> Self::Output {
-        let mut mat =
-            Matrix::<f32>::new((self.dimension.num_rows, self.dimension.num_cols)).unwrap();
+        let mut mat = Matrix::<f32>::new((self.dimension.rows, self.dimension.cols));
         let mut view = mat.view_mut(0, 0, self.dimension).unwrap();
-        for i in 0..self.dimension.num_rows {
-            for j in 0..self.dimension.num_cols {
+        for i in 0..self.dimension.rows {
+            for j in 0..self.dimension.cols {
                 view[(i, j)] = self[(i, j)] / rhs;
             }
         }
@@ -211,11 +231,10 @@ impl<'a> Div<f32> for &MatrixView<'a, f32> {
     type Output = Matrix<f32>;
 
     fn div(self, rhs: f32) -> Self::Output {
-        let mut mat =
-            Matrix::<f32>::new((self.dimension.num_rows, self.dimension.num_cols)).unwrap();
+        let mut mat = Matrix::<f32>::new((self.dimension.rows, self.dimension.cols));
         let mut view = mat.view_mut(0, 0, self.dimension).unwrap();
-        for i in 0..self.dimension.num_rows {
-            for j in 0..self.dimension.num_cols {
+        for i in 0..self.dimension.rows {
+            for j in 0..self.dimension.cols {
                 view[(i, j)] = self[(i, j)] / rhs;
             }
         }
@@ -226,8 +245,8 @@ impl<'a> Div<f32> for &MatrixView<'a, f32> {
 
 impl<'a, T: fmt::Debug> fmt::Debug for MatrixView<'a, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let m = self.dimension.num_rows;
-        let n = self.dimension.num_cols;
+        let m = self.dimension.rows;
+        let n = self.dimension.cols;
         write!(f, "{}", format_args!("MatrixView ({} x {}) [\n", m, n))?;
         for row in 0..m {
             for col in 0..n {
@@ -246,9 +265,16 @@ impl<'a, T: fmt::Debug> fmt::Debug for MatrixView<'a, T> {
 /// All operations on a `MatrixViewMut` are done in-place; use `MatrixView` if
 /// the original matrix should remain unchanged.
 pub struct MatrixViewMut<'a, T> {
+    /// An immutable reference to the underlying matrix's data.
     data: &'a mut T,
+
+    /// The row of the original matrix where this view starts at.
     start_row: usize,
+
+    /// The column of the original matrix where this view starts at.
     start_col: usize,
+
+    /// The dimensions of the view.
     dimension: Dimension,
 }
 
@@ -268,8 +294,8 @@ impl<'a, T> Index<(usize, usize)> for MatrixViewMut<'a, T> {
     type Output = T;
 
     fn index(&self, index: (usize, usize)) -> &Self::Output {
-        let num_rows = self.dimension.num_rows;
-        let num_cols = self.dimension.num_cols;
+        let num_rows = self.dimension.rows;
+        let num_cols = self.dimension.cols;
         if index.0 >= num_rows {
             panic!(
                 "{}",
@@ -277,7 +303,6 @@ impl<'a, T> Index<(usize, usize)> for MatrixViewMut<'a, T> {
                     "The row index must be less than {}",
                     num_rows
                 ))
-                .to_string()
             );
         } else if index.1 >= num_cols {
             panic!(
@@ -286,7 +311,6 @@ impl<'a, T> Index<(usize, usize)> for MatrixViewMut<'a, T> {
                     "The column index must be less than {}",
                     num_cols
                 ))
-                .to_string()
             );
         }
 
@@ -303,8 +327,8 @@ impl<'a, T> Index<(usize, usize)> for MatrixViewMut<'a, T> {
 
 impl<'a, T> IndexMut<(usize, usize)> for MatrixViewMut<'a, T> {
     fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
-        let num_rows = self.dimension.num_rows;
-        let num_cols = self.dimension.num_cols;
+        let num_rows = self.dimension.rows;
+        let num_cols = self.dimension.cols;
         if index.0 >= num_rows {
             panic!(
                 "{}",
@@ -312,7 +336,6 @@ impl<'a, T> IndexMut<(usize, usize)> for MatrixViewMut<'a, T> {
                     "The row index must be less than {}",
                     num_rows
                 ))
-                .to_string()
             );
         } else if index.1 >= num_cols {
             panic!(
@@ -321,7 +344,6 @@ impl<'a, T> IndexMut<(usize, usize)> for MatrixViewMut<'a, T> {
                     "The column index must be less than {}",
                     num_cols
                 ))
-                .to_string()
             );
         }
 
@@ -340,8 +362,8 @@ impl<'a> Mul<f32> for MatrixViewMut<'a, f32> {
     type Output = MatrixViewMut<'a, f32>;
 
     fn mul(mut self, rhs: f32) -> Self::Output {
-        for i in 0..self.dimension.num_rows {
-            for j in 0..self.dimension.num_cols {
+        for i in 0..self.dimension.rows {
+            for j in 0..self.dimension.cols {
                 self[(i, j)] *= rhs;
             }
         }
@@ -354,8 +376,8 @@ impl<'a> Mul<MatrixViewMut<'a, f32>> for f32 {
     type Output = MatrixViewMut<'a, f32>;
 
     fn mul(self, mut rhs: MatrixViewMut<'a, f32>) -> Self::Output {
-        for i in 0..rhs.dimension.num_rows {
-            for j in 0..rhs.dimension.num_cols {
+        for i in 0..rhs.dimension.rows {
+            for j in 0..rhs.dimension.cols {
                 rhs[(i, j)] *= self;
             }
         }
@@ -368,8 +390,8 @@ impl<'a> Mul<f32> for &mut MatrixViewMut<'a, f32> {
     type Output = MatrixViewMut<'a, f32>;
 
     fn mul(self, rhs: f32) -> Self::Output {
-        for i in 0..self.dimension.num_rows {
-            for j in 0..self.dimension.num_cols {
+        for i in 0..self.dimension.rows {
+            for j in 0..self.dimension.cols {
                 self[(i, j)] *= rhs;
             }
         }
@@ -382,8 +404,8 @@ impl<'a> Mul<&mut MatrixViewMut<'a, f32>> for f32 {
     type Output = MatrixViewMut<'a, f32>;
 
     fn mul(self, rhs: &mut MatrixViewMut<'a, f32>) -> Self::Output {
-        for i in 0..rhs.dimension.num_rows {
-            for j in 0..rhs.dimension.num_cols {
+        for i in 0..rhs.dimension.rows {
+            for j in 0..rhs.dimension.cols {
                 rhs[(i, j)] *= self;
             }
         }
@@ -396,8 +418,8 @@ impl<'a> Div<f32> for MatrixViewMut<'a, f32> {
     type Output = MatrixViewMut<'a, f32>;
 
     fn div(mut self, rhs: f32) -> Self::Output {
-        for i in 0..self.dimension.num_rows {
-            for j in 0..self.dimension.num_cols {
+        for i in 0..self.dimension.rows {
+            for j in 0..self.dimension.cols {
                 self[(i, j)] /= rhs;
             }
         }
@@ -410,8 +432,8 @@ impl<'a> Div<f32> for &mut MatrixViewMut<'a, f32> {
     type Output = MatrixViewMut<'a, f32>;
 
     fn div(self, rhs: f32) -> Self::Output {
-        for i in 0..self.dimension.num_rows {
-            for j in 0..self.dimension.num_cols {
+        for i in 0..self.dimension.rows {
+            for j in 0..self.dimension.cols {
                 self[(i, j)] /= rhs;
             }
         }
@@ -422,8 +444,8 @@ impl<'a> Div<f32> for &mut MatrixViewMut<'a, f32> {
 
 impl<'a, T: fmt::Debug> fmt::Debug for MatrixViewMut<'a, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let m = self.dimension.num_rows;
-        let n = self.dimension.num_cols;
+        let m = self.dimension.rows;
+        let n = self.dimension.cols;
         write!(f, "{}", format_args!("MatrixView ({} x {}) [\n", m, n))?;
         for row in 0..m {
             for col in 0..n {
@@ -439,14 +461,18 @@ impl<'a, T: fmt::Debug> fmt::Debug for MatrixViewMut<'a, T> {
 /// A `M x N` matrix containing elements of type `T`.
 ///
 /// ## Note
-/// All operations on a `Matrix` are done in-place; use `MatrixView` if the original matrix should
+/// * All operations on a `Matrix` are done in-place; use `MatrixView` if the original matrix should
 /// remain unchanged.
+/// * Adding/Subtracting/Multiplying/Dividing by a scalar will simply call the corresponding
+/// operation on a `MatrixView` of the matrix, and a new matrix will be created: explicitly call
+/// `view_self_mut` to modify the matrix inplace.
 pub struct Matrix<T = f32> {
-    data: NonNull<T>,
+    buffer: NonNull<T>,
     size: Dimension,
 }
 
 impl Matrix<f32> {
+    /// Creates a new `1 x N` matrix with linearly spaced values from `start` to `end`.
     pub fn linspace<const N: usize>(start: f32, end: f32) -> Self {
         let data = {
             let mut values = Vec::with_capacity(N);
@@ -460,21 +486,26 @@ impl Matrix<f32> {
         };
 
         Self {
-            data,
-            size: Dimension {
-                num_rows: 1,
-                num_cols: N,
-            },
+            buffer: data,
+            size: Dimension { rows: 1, cols: N },
         }
     }
 }
 
 impl<T> Matrix<T> {
-    pub fn new<S: MatrixSize>(size: S) -> MatrixResult<Self> {
+    /// Creates a new matrix with the specified number of rows and columns.
+    ///
+    /// # Panics
+    /// * Panics if the number of rows or columns is zero (Cannot create a scalar matrix).
+    /// * Panics if the global allocator fails to allocate the buffer for the matrix.
+    pub fn new<S: MatrixSize>(size: S) -> Self {
         if (size.num_cols() == 0) || (size.num_cols() == 0) {
-            return Err(MatrixError::InvalidShape(
-                "The number of rows and columns should be larger than zero".to_string(),
-            ));
+            panic!(
+                "{}",
+                MatrixError::InvalidShape(
+                    "The number of rows and columns should be larger than zero".to_string(),
+                )
+            );
         }
 
         let data = unsafe {
@@ -484,23 +515,30 @@ impl<T> Matrix<T> {
             )
             .expect(&MatrixError::AllocationFailed.to_string());
             let alloced = alloc::alloc(layout) as *mut T;
-            NonNull::new(alloced).ok_or(MatrixError::AllocationFailed)?
+            NonNull::new(alloced).expect(&MatrixError::AllocationFailed.to_string())
         };
 
-        Ok(Self {
-            data,
+        Self {
+            buffer: data,
             size: Dimension::new(size.num_rows(), size.num_cols()),
-        })
+        }
     }
 
-    pub fn from_vec(v: Vec<T>, size: Dimension) -> MatrixResult<Self> {
-        let num_rows = size.num_rows;
-        let num_cols = size.num_cols;
+    /// Creates a new matrix from the given `Vec<T>`.
+    ///
+    /// # Panics
+    /// * Panics if the length of the vector doesn't equal the specified size (`M x N`).
+    pub fn from_vec(v: Vec<T>, size: Dimension) -> Self {
+        let num_rows = size.rows;
+        let num_cols = size.cols;
         if v.len() != num_rows * num_cols {
-            return Err(MatrixError::InvalidShape(format!(
-                "The length of vector must be {} (`M x N`)",
-                num_rows * num_cols
-            )));
+            panic!(
+                "{}",
+                MatrixError::InvalidShape(format!(
+                    "The length of vector must be {} (`M x N`)",
+                    num_rows * num_cols
+                ))
+            );
         }
 
         let data = {
@@ -508,138 +546,187 @@ impl<T> Matrix<T> {
             NonNull::new(elems.as_mut_ptr()).unwrap()
         };
 
-        Ok(Self {
-            data,
-            size: Dimension { num_rows, num_cols },
-        })
+        Self {
+            buffer: data,
+            size: Dimension {
+                rows: num_rows,
+                cols: num_cols,
+            },
+        }
     }
 
+    /// Returns the size of the matrix.
     pub const fn size(&self) -> Dimension {
         self.size
     }
 
+    /// Checks if th matrix is square (# of rows == # of columns).
     pub const fn is_square(&self) -> bool {
-        self.size.num_rows == self.size.num_cols
+        self.size.rows == self.size.cols
     }
 
-    pub fn row<'a>(&'a self, index: usize) -> MatrixResult<MatrixView<'a, T>> {
-        if index >= self.size.num_rows {
-            return Err(MatrixError::IndexOutOfBounds(format!(
-                "The row index cannot be greater than or equal to {}",
-                self.size.num_rows
-            )));
+    /// Returns an immutable view of the specified row of the matrix.
+    ///
+    /// # Panics
+    /// Panics if the index is greater than or equal to the number of rows in the matrix.
+    pub fn row<'a>(&'a self, index: usize) -> MatrixView<'a, T> {
+        if index >= self.size.rows {
+            panic!(
+                "{}",
+                MatrixError::IndexOutOfBounds(format!(
+                    "The row index must be less than {}",
+                    self.size.rows
+                ))
+            );
         }
 
-        Ok(MatrixView {
-            data: &self.data,
+        MatrixView {
+            data: &self.buffer,
             start_row: index,
             start_col: 0,
             dimension: Dimension {
-                num_rows: 1,
-                num_cols: self.size.num_cols,
+                rows: 1,
+                cols: self.size.cols,
             },
-        })
+        }
     }
 
-    pub fn col<'a>(&'a self, index: usize) -> MatrixResult<MatrixView<'a, T>> {
-        if index >= self.size.num_cols {
-            return Err(MatrixError::IndexOutOfBounds(format!(
-                "The column index cannot be greater than or equal to {}",
-                self.size.num_cols
-            )));
+    /// Returns an immutable view of the specified column of the matrix.
+    ///
+    /// # Panics
+    /// Panics if the index is greater than or equal to the number of columns in the matrix.
+    pub fn col<'a>(&'a self, index: usize) -> MatrixView<'a, T> {
+        if index >= self.size.cols {
+            panic!(
+                "{}",
+                MatrixError::IndexOutOfBounds(format!(
+                    "The column index cannot be greater than or equal to {}",
+                    self.size.cols
+                ))
+            );
         }
 
-        Ok(MatrixView {
-            data: &self.data,
+        MatrixView {
+            data: &self.buffer,
             start_row: 0,
             start_col: index,
             dimension: Dimension {
-                num_rows: self.size.num_rows,
-                num_cols: 1,
+                rows: self.size.rows,
+                cols: 1,
             },
-        })
+        }
     }
 
+    /// Returns an immutable view into the specified subslice of the matrix.
+    ///
+    /// # Panics
+    /// * Panics if the start row or column are greater than or equal to the number of rows and
+    /// columns respectively.
+    /// * Panics if the view has more rows or columns than the original matrix (`self`).
     pub fn view<'a>(
         &'a self,
         start_row: usize,
         start_col: usize,
         dimension: Dimension,
-    ) -> MatrixResult<MatrixView<'a, T>> {
-        if start_row >= self.size.num_rows {
-            return Err(MatrixError::IndexOutOfBounds(format!(
-                "The start row must be less than {}",
-                self.size.num_rows
-            )));
-        } else if start_col >= self.size.num_cols {
-            return Err(MatrixError::IndexOutOfBounds(format!(
-                "The start col must be less than {}",
-                self.size.num_cols
-            )));
-        } else if dimension.num_rows > self.size.num_rows {
-            return Err(MatrixError::InvalidShape(
-                "The view cannot have more rows than `self".into(),
-            ));
-        } else if dimension.num_cols > self.size.num_cols {
-            return Err(MatrixError::InvalidShape(
-                "The view cannot have more columns than `self".into(),
-            ));
+    ) -> MatrixView<'a, T> {
+        if start_row >= self.size.rows {
+            panic!(
+                "{}",
+                MatrixError::IndexOutOfBounds(format!(
+                    "The start row must be less than {}",
+                    self.size.rows
+                ))
+            );
+        } else if start_col >= self.size.cols {
+            panic!(
+                "{}",
+                MatrixError::IndexOutOfBounds(format!(
+                    "The start col must be less than {}",
+                    self.size.cols
+                ))
+            );
+        } else if dimension.rows > self.size.rows {
+            panic!(
+                "{}",
+                MatrixError::InvalidShape("The view cannot have more rows than `self".into(),)
+            );
+        } else if dimension.cols > self.size.cols {
+            panic!(
+                "{}",
+                MatrixError::InvalidShape("The view cannot have more columns than `self".into(),)
+            );
         }
 
-        Ok(MatrixView {
-            data: &self.data,
+        MatrixView {
+            data: &self.buffer,
             start_row,
             start_col,
             dimension,
-        })
+        }
     }
 
+    /// Returns a mutable view into the specified subslice of the matrix.
+    ///
+    /// # Panics
+    /// * Panics if the start row or column are greater than or equal to the number of rows and
+    /// columns respectively.
+    /// * Panics if the view has more rows or columns than the original matrix (`self`).
     pub fn view_mut<'a>(
         &'a mut self,
         start_row: usize,
         start_col: usize,
         dimension: Dimension,
-    ) -> MatrixResult<MatrixViewMut<'a, T>> {
-        if start_row >= self.size.num_rows {
-            return Err(MatrixError::IndexOutOfBounds(format!(
-                "The start row must be less than {}",
-                self.size.num_rows
-            )));
-        } else if start_col >= self.size.num_cols {
-            return Err(MatrixError::IndexOutOfBounds(format!(
-                "The start col must be less than {}",
-                self.size.num_cols
-            )));
-        } else if dimension.num_rows > self.size.num_rows {
-            return Err(MatrixError::InvalidShape(
-                "The view cannot have more rows than `self".into(),
-            ));
-        } else if dimension.num_cols > self.size.num_cols {
-            return Err(MatrixError::InvalidShape(
-                "The view cannot have more columns than `self".into(),
-            ));
+    ) -> MatrixViewMut<'a, T> {
+        if start_row >= self.size.rows {
+            panic!(
+                "{}",
+                MatrixError::IndexOutOfBounds(format!(
+                    "The start row must be less than {}",
+                    self.size.rows
+                ))
+            );
+        } else if start_col >= self.size.cols {
+            panic!(
+                "{}",
+                MatrixError::IndexOutOfBounds(format!(
+                    "The start col must be less than {}",
+                    self.size.cols
+                ))
+            );
+        } else if dimension.rows > self.size.rows {
+            panic!(
+                "{}",
+                MatrixError::InvalidShape("The view cannot have more rows than `self".into(),)
+            );
+        } else if dimension.cols > self.size.cols {
+            panic!(
+                "{}",
+                MatrixError::InvalidShape("The view cannot have more columns than `self".into(),)
+            );
         }
 
-        Ok(MatrixViewMut {
-            data: unsafe { self.data.as_mut() },
+        MatrixViewMut {
+            data: unsafe { self.buffer.as_mut() },
             start_row,
             start_col,
             dimension,
-        })
+        }
     }
 
+    /// Returns an immutable view into the the entire matrix.
     pub fn view_self<'a>(&'a self) -> MatrixView<'a, T> {
         MatrixView {
-            data: &self.data,
+            data: &self.buffer,
             start_row: 0,
             start_col: 0,
             dimension: self.size,
         }
     }
 
+    /// Returns a mutable view into the the entire matrix.
     pub fn view_self_mut<'a>(&'a mut self) -> MatrixViewMut<'a, T> {
         MatrixViewMut {
-            data: unsafe { self.data.as_mut() },
+            data: unsafe { self.buffer.as_mut() },
             start_row: 0,
             start_col: 0,
             dimension: self.size,
@@ -649,12 +736,12 @@ impl<T> Matrix<T> {
 
 impl<T> Drop for Matrix<T> {
     fn drop(&mut self) {
-        let m = self.size.num_rows;
-        let n = self.size.num_cols;
+        let m = self.size.rows;
+        let n = self.size.cols;
         unsafe {
             let layout = Layout::from_size_align(m * n, std::mem::align_of::<T>())
                 .expect(&MatrixError::AllocationFailed.to_string());
-            alloc::dealloc(self.data.as_ptr() as *mut u8, layout);
+            alloc::dealloc(self.buffer.as_ptr() as *mut u8, layout);
         }
     }
 }
@@ -663,24 +750,22 @@ impl<T> Index<(usize, usize)> for Matrix<T> {
     type Output = T;
 
     fn index(&self, index: (usize, usize)) -> &Self::Output {
-        let m = self.size.num_rows;
-        let n = self.size.num_cols;
+        let m = self.size.rows;
+        let n = self.size.cols;
         if index.0 >= m {
             panic!(
                 "{}",
                 MatrixError::IndexOutOfBounds(format!("The row index must be less than {}", m))
-                    .to_string()
             );
         } else if index.1 >= n {
             panic!(
                 "{}",
                 MatrixError::IndexOutOfBounds(format!("The column index must be less than {}", n))
-                    .to_string()
             );
         }
 
         unsafe {
-            self.data
+            self.buffer
                 .as_ptr()
                 .add(n * index.0 + index.1)
                 .as_ref()
@@ -745,8 +830,8 @@ impl<'a> Div<f32> for Matrix<f32> {
 
 impl<T: fmt::Debug> fmt::Debug for Matrix<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let m = self.size.num_rows;
-        let n = self.size.num_cols;
+        let m = self.size.rows;
+        let n = self.size.cols;
         write!(f, "{}", format_args!("Matrix ({} x {}) [\n", m, n))?;
         for row in 0..m {
             for col in 0..n {
@@ -765,7 +850,7 @@ mod tests {
 
     #[test]
     fn can_init() -> MatrixResult<()> {
-        let mat: Matrix<f32> = Matrix::new((2, 2))?;
+        let mat: Matrix<f32> = Matrix::new((2, 2));
         assert_eq!(mat.size(), Dimension::new(2, 2));
         // dbg!(&mat);
 
@@ -777,7 +862,7 @@ mod tests {
         }
         // dbg!(&mat2);
 
-        let mat3 = Matrix::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], (2, 3).into())?;
+        let mat3 = Matrix::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], (2, 3).into());
         let v = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
         for i in 0..2 {
             for j in 0..3 {
@@ -791,7 +876,7 @@ mod tests {
 
     #[test]
     fn can_mul() -> MatrixResult<()> {
-        let mut mat = Matrix::from_vec(vec![1.0, 2.0, 3.0, 4.0], (2, 2).into())?;
+        let mut mat = Matrix::from_vec(vec![1.0, 2.0, 3.0, 4.0], (2, 2).into());
         {
             let new_mat = 3.0 * mat.clone() * 1.0;
             for i in 0..2 {
@@ -818,7 +903,7 @@ mod tests {
 
     #[test]
     fn can_div() -> MatrixResult<()> {
-        let mut mat = Matrix::from_vec(vec![1.0, 2.0, 3.0, 4.0], (2, 2).into())?;
+        let mut mat = Matrix::from_vec(vec![1.0, 2.0, 3.0, 4.0], (2, 2).into());
         {
             let new_mat = mat.clone() / 3.0;
             for i in 0..2 {
