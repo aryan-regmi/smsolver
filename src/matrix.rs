@@ -124,6 +124,39 @@ impl<'a, T> Index<(usize, usize)> for MatrixView<'a, T> {
     }
 }
 
+impl<'a> Mul<f32> for MatrixView<'a, f32> {
+    type Output = Matrix<f32>;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        let mut mat =
+            Matrix::<f32>::new((self.dimension.num_rows, self.dimension.num_cols)).unwrap();
+        let mut view = mat.view_mut(0, 0, self.dimension).unwrap();
+        for i in 0..self.dimension.num_rows {
+            for j in 0..self.dimension.num_cols {
+                view[(i, j)] = self[(i, j)] * rhs;
+            }
+        }
+
+        mat
+    }
+}
+
+impl<'a> Mul<MatrixView<'a, f32>> for f32 {
+    type Output = Matrix<f32>;
+
+    fn mul(self, rhs: MatrixView<'a, f32>) -> Self::Output {
+        let mut mat = Matrix::<f32>::new((rhs.dimension.num_rows, rhs.dimension.num_cols)).unwrap();
+        let mut view = mat.view_mut(0, 0, rhs.dimension).unwrap();
+        for i in 0..rhs.dimension.num_rows {
+            for j in 0..rhs.dimension.num_cols {
+                view[(i, j)] = rhs[(i, j)] * self;
+            }
+        }
+
+        mat
+    }
+}
+
 impl<'a> Mul<f32> for &MatrixView<'a, f32> {
     type Output = Matrix<f32>;
 
@@ -157,16 +190,44 @@ impl<'a> Mul<&MatrixView<'a, f32>> for f32 {
     }
 }
 
+impl<'a, T: fmt::Debug> fmt::Debug for MatrixView<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let m = self.dimension.num_rows;
+        let n = self.dimension.num_cols;
+        write!(f, "{}", format_args!("MatrixView ({} x {}) [\n", m, n))?;
+        for row in 0..m {
+            for col in 0..n {
+                let val = &self[(row, col)];
+                write!(f, "{}", format_args!(" {:?} ", val))?;
+            }
+            write!(f, "\n")?;
+        }
+        write!(f, "]\n")
+    }
+}
+
 /// A mutable view into a matrix.
 ///
 /// ## Note
 /// All operations on a `MatrixViewMut` are done in-place; use `MatrixView` if
 /// the original matrix should remain unchanged.
 pub struct MatrixViewMut<'a, T> {
-    data: &'a mut NonNull<T>,
+    data: &'a mut T,
     start_row: usize,
     start_col: usize,
     dimension: Dimension,
+}
+
+impl<'a, T> Clone for MatrixViewMut<'a, T> {
+    fn clone(&self) -> Self {
+        let data = unsafe { (self.data as *const T as *mut T).as_mut().unwrap() };
+        Self {
+            data,
+            start_row: self.start_row.clone(),
+            start_col: self.start_col.clone(),
+            dimension: self.dimension.clone(),
+        }
+    }
 }
 
 impl<'a, T> Index<(usize, usize)> for MatrixViewMut<'a, T> {
@@ -198,8 +259,7 @@ impl<'a, T> Index<(usize, usize)> for MatrixViewMut<'a, T> {
         unsafe {
             let row = index.0 + self.start_row;
             let col = index.1 + self.start_col;
-            self.data
-                .as_ptr()
+            (self.data as *const T as *mut T)
                 .add(num_cols * row + col)
                 .as_ref()
                 .unwrap()
@@ -234,12 +294,83 @@ impl<'a, T> IndexMut<(usize, usize)> for MatrixViewMut<'a, T> {
         unsafe {
             let row = index.0 + self.start_row;
             let col = index.1 + self.start_col;
-            self.data
-                .as_ptr()
+            (self.data as *mut T)
                 .add(num_cols * row + col)
                 .as_mut()
                 .unwrap()
         }
+    }
+}
+
+impl<'a> Mul<f32> for MatrixViewMut<'a, f32> {
+    type Output = MatrixViewMut<'a, f32>;
+
+    fn mul(mut self, rhs: f32) -> Self::Output {
+        for i in 0..self.dimension.num_rows {
+            for j in 0..self.dimension.num_cols {
+                self[(i, j)] *= rhs;
+            }
+        }
+
+        self
+    }
+}
+
+impl<'a> Mul<MatrixViewMut<'a, f32>> for f32 {
+    type Output = MatrixViewMut<'a, f32>;
+
+    fn mul(self, mut rhs: MatrixViewMut<'a, f32>) -> Self::Output {
+        for i in 0..rhs.dimension.num_rows {
+            for j in 0..rhs.dimension.num_cols {
+                rhs[(i, j)] *= self;
+            }
+        }
+
+        rhs
+    }
+}
+
+impl<'a> Mul<f32> for &mut MatrixViewMut<'a, f32> {
+    type Output = MatrixViewMut<'a, f32>;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        for i in 0..self.dimension.num_rows {
+            for j in 0..self.dimension.num_cols {
+                self[(i, j)] *= rhs;
+            }
+        }
+
+        self.clone()
+    }
+}
+
+impl<'a> Mul<&mut MatrixViewMut<'a, f32>> for f32 {
+    type Output = MatrixViewMut<'a, f32>;
+
+    fn mul(self, rhs: &mut MatrixViewMut<'a, f32>) -> Self::Output {
+        for i in 0..rhs.dimension.num_rows {
+            for j in 0..rhs.dimension.num_cols {
+                rhs[(i, j)] *= self;
+            }
+        }
+
+        rhs.clone()
+    }
+}
+
+impl<'a, T: fmt::Debug> fmt::Debug for MatrixViewMut<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let m = self.dimension.num_rows;
+        let n = self.dimension.num_cols;
+        write!(f, "{}", format_args!("MatrixView ({} x {}) [\n", m, n))?;
+        for row in 0..m {
+            for col in 0..n {
+                let val = &self[(row, col)];
+                write!(f, "{}", format_args!(" {:?} ", val))?;
+            }
+            write!(f, "\n")?;
+        }
+        write!(f, "]\n")
     }
 }
 
@@ -278,7 +409,7 @@ impl Matrix<f32> {
 
 impl<T> Matrix<T> {
     pub fn new<S: MatrixSize>(size: S) -> MatrixResult<Self> {
-        if (size.num_cols() != 0) && (size.num_cols() != 0) {
+        if (size.num_cols() == 0) || (size.num_cols() == 0) {
             return Err(MatrixError::InvalidShape(
                 "The number of rows and columns should be larger than zero".to_string(),
             ));
@@ -428,11 +559,29 @@ impl<T> Matrix<T> {
         }
 
         Ok(MatrixViewMut {
-            data: &mut self.data,
+            data: unsafe { self.data.as_mut() },
             start_row,
             start_col,
             dimension,
         })
+    }
+
+    pub fn view_self<'a>(&'a self) -> MatrixView<'a, T> {
+        MatrixView {
+            data: &self.data,
+            start_row: 0,
+            start_col: 0,
+            dimension: self.size,
+        }
+    }
+
+    pub fn view_self_mut<'a>(&'a mut self) -> MatrixViewMut<'a, T> {
+        MatrixViewMut {
+            data: unsafe { self.data.as_mut() },
+            start_row: 0,
+            start_col: 0,
+            dimension: self.size,
+        }
     }
 }
 
@@ -478,6 +627,44 @@ impl<T> Index<(usize, usize)> for Matrix<T> {
     }
 }
 
+impl Clone for Matrix<f32> {
+    fn clone(&self) -> Self {
+        self.view_self() * 1.0
+    }
+}
+
+impl<'a> Mul<f32> for &Matrix<f32> {
+    type Output = Matrix<f32>;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        self.view(0, 0, self.size).unwrap() * rhs
+    }
+}
+
+impl<'a> Mul<&Matrix<f32>> for f32 {
+    type Output = Matrix<f32>;
+
+    fn mul(self, rhs: &Matrix<f32>) -> Self::Output {
+        self * rhs.view(0, 0, rhs.size).unwrap()
+    }
+}
+
+impl<'a> Mul<f32> for Matrix<f32> {
+    type Output = Matrix<f32>;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        self.view(0, 0, self.size).unwrap() * rhs
+    }
+}
+
+impl<'a> Mul<Matrix<f32>> for f32 {
+    type Output = Matrix<f32>;
+
+    fn mul(self, rhs: Matrix<f32>) -> Self::Output {
+        self * rhs.view(0, 0, rhs.size).unwrap()
+    }
+}
+
 impl<T: fmt::Debug> fmt::Debug for Matrix<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let m = self.size.num_rows;
@@ -501,14 +688,52 @@ mod tests {
     #[test]
     fn can_init() -> MatrixResult<()> {
         let mat: Matrix<f32> = Matrix::new((2, 2))?;
-        dbg!(&mat);
         assert_eq!(mat.size(), Dimension::new(2, 2));
+        // dbg!(&mat);
 
         let mat2 = Matrix::linspace::<5>(1.0, 5.0);
-        dbg!(mat2);
+        assert_eq!(mat2.size(), Dimension::new(1, 5));
+        let v = vec![1., 2., 3., 4., 5.];
+        for j in 0..5 {
+            assert_eq!(mat2[(0, j)], v[j]);
+        }
+        // dbg!(&mat2);
 
         let mat3 = Matrix::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], (2, 3).into())?;
-        dbg!(mat3);
+        let v = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+        for i in 0..2 {
+            for j in 0..3 {
+                assert_eq!(mat3[(i, j)], v[3 * i + j]);
+            }
+        }
+        // dbg!(mat3);
+
+        Ok(())
+    }
+
+    #[test]
+    fn can_mul() -> MatrixResult<()> {
+        let mut mat = Matrix::from_vec(vec![1.0, 2.0, 3.0, 4.0], (2, 2).into())?;
+        {
+            let new_mat = 3.0 * mat.clone() * 1.0;
+            for i in 0..2 {
+                for j in 0..2 {
+                    assert_eq!(new_mat[(i, j)], 3.0 * mat[(i, j)]);
+                }
+            }
+        }
+
+        // Inplace
+        {
+            let mat_view = 1.0 * mat.view_self_mut() * 3.0;
+
+            let v = vec![3., 6., 9., 12.];
+            for i in 0..2 {
+                for j in 0..2 {
+                    assert_eq!(mat_view[(i, j)], v[i * 2 + j]);
+                }
+            }
+        }
 
         Ok(())
     }
