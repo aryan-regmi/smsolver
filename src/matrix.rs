@@ -1,7 +1,7 @@
 use std::{
     fmt,
     mem::ManuallyDrop,
-    ops::{Index, IndexMut},
+    ops::{Index, IndexMut, Mul},
     ptr::NonNull,
     usize,
 };
@@ -79,6 +79,38 @@ impl<'a, T> Index<(usize, usize)> for MatrixView<'a, T> {
                 .as_ref()
                 .unwrap()
         }
+    }
+}
+
+impl<'a> Mul<f32> for &MatrixView<'a, f32> {
+    type Output = Matrix<f32>;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        let mut mat: Matrix<f32> = Matrix::new(self.dimension.num_rows, self.dimension.num_cols);
+        let mut view = mat.view_mut(0, 0, self.dimension).unwrap();
+        for i in 0..self.dimension.num_rows {
+            for j in 0..self.dimension.num_cols {
+                view[(i, j)] = self[(i, j)] * rhs;
+            }
+        }
+
+        mat
+    }
+}
+
+impl<'a> Mul<&MatrixView<'a, f32>> for f32 {
+    type Output = Matrix<f32>;
+
+    fn mul(self, rhs: &MatrixView<'a, f32>) -> Self::Output {
+        let mut mat: Matrix<f32> = Matrix::new(rhs.dimension.num_rows, rhs.dimension.num_cols);
+        let mut view = mat.view_mut(0, 0, rhs.dimension).unwrap();
+        for i in 0..rhs.dimension.num_rows {
+            for j in 0..rhs.dimension.num_cols {
+                view[(i, j)] = rhs[(i, j)] * self;
+            }
+        }
+
+        mat
     }
 }
 
@@ -202,18 +234,15 @@ impl Matrix<f32> {
 }
 
 impl<T: Default + Clone> Matrix<T> {
-    pub fn new<const M: usize, const N: usize>() -> Self {
+    pub fn new(num_rows: usize, num_cols: usize) -> Self {
         let data = {
-            let mut elems = ManuallyDrop::new(vec![T::default(); M * N]);
+            let mut elems = ManuallyDrop::new(vec![T::default(); num_rows * num_cols]);
             NonNull::new(elems.as_mut_ptr()).unwrap()
         };
 
         Self {
             data,
-            size: Dimension {
-                num_rows: M,
-                num_cols: N,
-            },
+            size: Dimension { num_rows, num_cols },
         }
     }
 }
@@ -418,7 +447,7 @@ mod tests {
 
     #[test]
     fn can_init() -> MatrixResult<()> {
-        let mat: Matrix<f32> = Matrix::new::<2, 2>();
+        let mat: Matrix<f32> = Matrix::new(2, 2);
         dbg!(&mat);
         assert_eq!(mat.size(), Dimension::new(2, 2));
 
