@@ -1,4 +1,5 @@
 use std::{
+    alloc::{self, Layout},
     fmt,
     mem::ManuallyDrop,
     ops::{Index, IndexMut, Mul},
@@ -14,19 +15,60 @@ pub enum MatrixError {
 
     #[error("InvalidShape: {0}")]
     InvalidShape(String),
+
+    #[error("AllocationFailed: Unable to allocate memory for the matrix")]
+    AllocationFailed,
 }
 
 pub type MatrixResult<T> = Result<T, MatrixError>;
 
+pub trait MatrixSize {
+    fn num_rows(&self) -> usize;
+    fn num_cols(&self) -> usize;
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Dimension {
-    pub num_rows: usize,
-    pub num_cols: usize,
+    num_rows: usize,
+    num_cols: usize,
 }
 
 impl Dimension {
     pub fn new(num_rows: usize, num_cols: usize) -> Self {
         Self { num_rows, num_cols }
+    }
+}
+
+impl MatrixSize for Dimension {
+    #[inline]
+    fn num_rows(&self) -> usize {
+        self.num_rows
+    }
+
+    #[inline]
+    fn num_cols(&self) -> usize {
+        self.num_cols
+    }
+}
+
+impl From<(usize, usize)> for Dimension {
+    fn from(value: (usize, usize)) -> Self {
+        Self {
+            num_rows: value.0,
+            num_cols: value.1,
+        }
+    }
+}
+
+impl MatrixSize for (usize, usize) {
+    #[inline]
+    fn num_rows(&self) -> usize {
+        self.0
+    }
+
+    #[inline]
+    fn num_cols(&self) -> usize {
+        self.1
     }
 }
 
@@ -86,7 +128,8 @@ impl<'a> Mul<f32> for &MatrixView<'a, f32> {
     type Output = Matrix<f32>;
 
     fn mul(self, rhs: f32) -> Self::Output {
-        let mut mat: Matrix<f32> = Matrix::new(self.dimension.num_rows, self.dimension.num_cols);
+        let mut mat =
+            Matrix::<f32>::new((self.dimension.num_rows, self.dimension.num_cols)).unwrap();
         let mut view = mat.view_mut(0, 0, self.dimension).unwrap();
         for i in 0..self.dimension.num_rows {
             for j in 0..self.dimension.num_cols {
@@ -102,7 +145,7 @@ impl<'a> Mul<&MatrixView<'a, f32>> for f32 {
     type Output = Matrix<f32>;
 
     fn mul(self, rhs: &MatrixView<'a, f32>) -> Self::Output {
-        let mut mat: Matrix<f32> = Matrix::new(rhs.dimension.num_rows, rhs.dimension.num_cols);
+        let mut mat = Matrix::<f32>::new((rhs.dimension.num_rows, rhs.dimension.num_cols)).unwrap();
         let mut view = mat.view_mut(0, 0, rhs.dimension).unwrap();
         for i in 0..rhs.dimension.num_rows {
             for j in 0..rhs.dimension.num_cols {
@@ -233,26 +276,37 @@ impl Matrix<f32> {
     }
 }
 
-impl<T: Default + Clone> Matrix<T> {
-    pub fn new(num_rows: usize, num_cols: usize) -> Self {
-        let data = {
-            let mut elems = ManuallyDrop::new(vec![T::default(); num_rows * num_cols]);
-            NonNull::new(elems.as_mut_ptr()).unwrap()
+impl<T> Matrix<T> {
+    pub fn new<S: MatrixSize>(size: S) -> MatrixResult<Self> {
+        if (size.num_cols() != 0) && (size.num_cols() != 0) {
+            return Err(MatrixError::InvalidShape(
+                "The number of rows and columns should be larger than zero".to_string(),
+            ));
+        }
+
+        let data = unsafe {
+            let layout = Layout::from_size_align(
+                size.num_rows() * size.num_cols(),
+                std::mem::align_of::<T>(),
+            )
+            .expect(&MatrixError::AllocationFailed.to_string());
+            let alloced = alloc::alloc(layout) as *mut T;
+            NonNull::new(alloced).ok_or(MatrixError::AllocationFailed)?
         };
 
-        Self {
+        Ok(Self {
             data,
-            size: Dimension { num_rows, num_cols },
-        }
+            size: Dimension::new(size.num_rows(), size.num_cols()),
+        })
     }
-}
 
-impl<T> Matrix<T> {
-    pub fn from_vec<const M: usize, const N: usize>(v: Vec<T>) -> MatrixResult<Self> {
-        if v.len() != M * N {
+    pub fn from_vec(v: Vec<T>, size: Dimension) -> MatrixResult<Self> {
+        let num_rows = size.num_rows;
+        let num_cols = size.num_cols;
+        if v.len() != num_rows * num_cols {
             return Err(MatrixError::InvalidShape(format!(
                 "The length of vector must be {} (`M x N`)",
-                M * N
+                num_rows * num_cols
             )));
         }
 
@@ -263,10 +317,7 @@ impl<T> Matrix<T> {
 
         Ok(Self {
             data,
-            size: Dimension {
-                num_rows: M,
-                num_cols: N,
-            },
+            size: Dimension { num_rows, num_cols },
         })
     }
 
@@ -390,24 +441,10 @@ impl<T> Drop for Matrix<T> {
         let m = self.size.num_rows;
         let n = self.size.num_cols;
         unsafe {
-            Vec::from_raw_parts(self.data.as_mut(), m * n, m * n);
+            let layout = Layout::from_size_align(m * n, std::mem::align_of::<T>())
+                .expect(&MatrixError::AllocationFailed.to_string());
+            alloc::dealloc(self.data.as_ptr() as *mut u8, layout);
         }
-    }
-}
-
-impl<T: fmt::Debug> fmt::Debug for Matrix<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let m = self.size.num_rows;
-        let n = self.size.num_cols;
-        write!(f, "{}", format_args!("Matrix ({} x {}) [\n", m, n))?;
-        for row in 0..m {
-            for col in 0..n {
-                let val = &self[(row, col)];
-                write!(f, "{}", format_args!(" {:?} ", val))?;
-            }
-            write!(f, "\n")?;
-        }
-        write!(f, "]\n")
     }
 }
 
@@ -441,18 +478,37 @@ impl<T> Index<(usize, usize)> for Matrix<T> {
     }
 }
 
+impl<T: fmt::Debug> fmt::Debug for Matrix<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let m = self.size.num_rows;
+        let n = self.size.num_cols;
+        write!(f, "{}", format_args!("Matrix ({} x {}) [\n", m, n))?;
+        for row in 0..m {
+            for col in 0..n {
+                let val = &self[(row, col)];
+                write!(f, "{}", format_args!(" {:?} ", val))?;
+            }
+            write!(f, "\n")?;
+        }
+        write!(f, "]\n")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn can_init() -> MatrixResult<()> {
-        let mat: Matrix<f32> = Matrix::new(2, 2);
+        let mat: Matrix<f32> = Matrix::new((2, 2))?;
         dbg!(&mat);
         assert_eq!(mat.size(), Dimension::new(2, 2));
 
         let mat2 = Matrix::linspace::<5>(1.0, 5.0);
         dbg!(mat2);
+
+        let mat3 = Matrix::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], (2, 3).into())?;
+        dbg!(mat3);
 
         Ok(())
     }
