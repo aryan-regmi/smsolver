@@ -1198,19 +1198,46 @@ mod tests {
     fn can_add() -> MatrixResult<()> {
         let mut mat = Matrix::from_vec(vec![1.0, 2.0, 3.0, 4.0], (2, 2).into());
         {
-            let new_mat = 3.0 * mat.clone() * 1.0;
+            let new_mat = 3.0 + mat.clone() + 1.0;
             for i in 0..2 {
                 for j in 0..2 {
-                    assert_eq!(new_mat[(i, j)], 3.0 * mat[(i, j)]);
+                    assert_eq!(new_mat[(i, j)], 4.0 + mat[(i, j)]);
                 }
             }
         }
 
         // Inplace
         {
-            let mat_view = 1.0 * mat.view_self_mut() * 3.0;
+            let mat_view = 1.0 + mat.view_self_mut() + 3.0;
 
-            let v = vec![3., 6., 9., 12.];
+            let v = vec![5., 6., 7., 8.];
+            for i in 0..2 {
+                for j in 0..2 {
+                    assert_eq!(mat_view[(i, j)], v[i * 2 + j]);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn can_sub() -> MatrixResult<()> {
+        let mut mat = Matrix::from_vec(vec![1.0, 2.0, 3.0, 4.0], (2, 2).into());
+        {
+            let new_mat = 3.0 - mat.clone() - 1.0;
+            for i in 0..2 {
+                for j in 0..2 {
+                    assert_eq!(new_mat[(i, j)], 3.0 - mat[(i, j)] - 1.0);
+                }
+            }
+        }
+
+        // Inplace
+        {
+            let mat_view = 3.0 - mat.view_self_mut() - 1.0;
+
+            let v = vec![1., 0., -1., -2.];
             for i in 0..2 {
                 for j in 0..2 {
                     assert_eq!(mat_view[(i, j)], v[i * 2 + j]);
