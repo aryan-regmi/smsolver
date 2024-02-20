@@ -8,6 +8,11 @@ use std::{
 };
 use thiserror::Error;
 
+// TODO: Make `Matrix` be like `MatrixView`, and `MatrixView` be like `MatrixViewMut`
+//  - Make a separate `MatrixBuilder` to push rows and cols etc
+//
+// TODO: Make operations/implementations fully generic!
+
 /// Possible errors returned by matrix methods.
 #[derive(Debug, Error)]
 pub enum MatrixError {
@@ -104,9 +109,30 @@ pub struct MatrixView<'a, T> {
     dimension: Dimension,
 }
 
-impl<'a, T> MatrixView<'a, T> {
-    pub fn mul(&self, other: &Self) -> Matrix {
-        todo!()
+impl<'a> MatrixView<'a, f32> {
+    pub fn mul(&self, other: &Self) -> MatrixResult<Matrix> {
+        if self.dimension.num_cols() != other.dimension.num_rows() {
+            return Err(MatrixError::InvalidShape(format!("The inner dimensions of the two matrices must match when performing matrix multiplication")));
+        }
+
+        let m = self.dimension.num_rows();
+        let n = self.dimension.num_cols();
+        let p = other.dimension.num_cols();
+        let mut mat: Matrix<f32> = Matrix::new((m, p));
+        let mut view = mat.view_self_mut();
+
+        // NOTE: Use more efficient algorithm
+        for i in 0..m {
+            for j in 0..p {
+                let mut sum = 0.0;
+                for k in 0..n {
+                    sum += self[(i, k)] * other[(k, j)];
+                }
+                view[(i, j)] = sum;
+            }
+        }
+
+        Ok(mat)
     }
 }
 
@@ -124,7 +150,8 @@ impl<'a, T> Index<(usize, usize)> for MatrixView<'a, T> {
                     num_rows
                 ))
             );
-        } else if index.1 >= num_cols {
+        }
+        if index.1 >= num_cols {
             panic!(
                 "{}",
                 MatrixError::IndexOutOfBounds(format!(
@@ -432,7 +459,8 @@ impl<'a, T> Index<(usize, usize)> for MatrixViewMut<'a, T> {
                     num_rows
                 ))
             );
-        } else if index.1 >= num_cols {
+        }
+        if index.1 >= num_cols {
             panic!(
                 "{}",
                 MatrixError::IndexOutOfBounds(format!(
@@ -465,7 +493,8 @@ impl<'a, T> IndexMut<(usize, usize)> for MatrixViewMut<'a, T> {
                     num_rows
                 ))
             );
-        } else if index.1 >= num_cols {
+        }
+        if index.1 >= num_cols {
             panic!(
                 "{}",
                 MatrixError::IndexOutOfBounds(format!(
@@ -893,7 +922,8 @@ impl<T> Matrix<T> {
                     self.size.rows
                 ))
             );
-        } else if start_col >= self.size.cols {
+        }
+        if start_col >= self.size.cols {
             panic!(
                 "{}",
                 MatrixError::IndexOutOfBounds(format!(
@@ -901,12 +931,14 @@ impl<T> Matrix<T> {
                     self.size.cols
                 ))
             );
-        } else if dimension.rows > self.size.rows {
+        }
+        if dimension.rows > self.size.rows {
             panic!(
                 "{}",
                 MatrixError::InvalidShape("The view cannot have more rows than `self".into(),)
             );
-        } else if dimension.cols > self.size.cols {
+        }
+        if dimension.cols > self.size.cols {
             panic!(
                 "{}",
                 MatrixError::InvalidShape("The view cannot have more columns than `self".into(),)
@@ -941,7 +973,8 @@ impl<T> Matrix<T> {
                     self.size.rows
                 ))
             );
-        } else if start_col >= self.size.cols {
+        }
+        if start_col >= self.size.cols {
             panic!(
                 "{}",
                 MatrixError::IndexOutOfBounds(format!(
@@ -949,12 +982,14 @@ impl<T> Matrix<T> {
                     self.size.cols
                 ))
             );
-        } else if dimension.rows > self.size.rows {
+        }
+        if dimension.rows > self.size.rows {
             panic!(
                 "{}",
                 MatrixError::InvalidShape("The view cannot have more rows than `self".into(),)
             );
-        } else if dimension.cols > self.size.cols {
+        }
+        if dimension.cols > self.size.cols {
             panic!(
                 "{}",
                 MatrixError::InvalidShape("The view cannot have more columns than `self".into(),)
@@ -988,6 +1023,9 @@ impl<T> Matrix<T> {
             dimension: self.size,
         }
     }
+
+    // TODO: Add `push_[row/col]` func
+    // TODO: Add `append` func
 }
 
 impl<T> Drop for Matrix<T> {
@@ -1013,7 +1051,8 @@ impl<T> Index<(usize, usize)> for Matrix<T> {
                 "{}",
                 MatrixError::IndexOutOfBounds(format!("The row index must be less than {}", m))
             );
-        } else if index.1 >= n {
+        }
+        if index.1 >= n {
             panic!(
                 "{}",
                 MatrixError::IndexOutOfBounds(format!("The column index must be less than {}", n))
