@@ -4,6 +4,7 @@ pub use units::force::{Newton, Pound};
 pub use units::length::{Kilometer, Meter};
 
 pub mod matrix;
+pub mod matrix_old;
 
 pub mod system;
 
