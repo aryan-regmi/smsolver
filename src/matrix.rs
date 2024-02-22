@@ -2,7 +2,7 @@ use std::{
     alloc::{self, Layout},
     fmt,
     mem::ManuallyDrop,
-    ops::{Add, AddAssign, Index, IndexMut, Mul, MulAssign, Sub, SubAssign},
+    ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Sub, SubAssign},
     ptr::NonNull,
 };
 
@@ -680,6 +680,19 @@ impl Mul<Matrix<isize>> for isize {
     }
 }
 
+impl<T: DivAssign + Clone> Div<T> for Matrix<T> {
+    type Output = Self;
+
+    fn div(mut self, rhs: T) -> Self::Output {
+        for i in 0..self.size().rows() {
+            for j in 0..self.size().cols() {
+                self[(i, j)] /= rhs.clone();
+            }
+        }
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -758,6 +771,23 @@ mod tests {
             }
             dbg!(&new_mat);
             dbg!(&mat);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn can_div() -> MatrixResult<()> {
+        let mat = Matrix::from_vec(vec![3.0, 6.0, 9.0, 12.0], (2, 2).into())?;
+        {
+            let new_mat: Matrix<f64> = mat.clone() / 3.0;
+            for i in 0..2 {
+                for j in 0..2 {
+                    assert_eq!(new_mat[(i, j)], mat[(i, j)] / 3.0);
+                }
+            }
+            // dbg!(&new_mat);
+            // dbg!(&mat);
         }
 
         Ok(())
