@@ -7,6 +7,9 @@ use std::{
 };
 
 // TODO: Add `MatrixView` that acts on &Matrix only
+//  - Allows creating subslices w/out allocating new stuff
+//
+// TODO: Add QR and LU solvers for inverses (add more specified algos eventually)
 
 /// Possible errors returned by matrix methods.
 #[derive(Debug, thiserror::Error)]
