@@ -209,6 +209,27 @@ impl<T: fmt::Debug> fmt::Debug for Matrix<T> {
     }
 }
 
+impl<T: PartialEq> PartialEq for Matrix<T> {
+    fn eq(&self, other: &Self) -> bool {
+        if self.size().rows() != other.size().rows() {
+            false
+        } else if self.size().cols() != other.size().cols() {
+            false
+        } else {
+            let m = self.size().rows();
+            let n = self.size().cols();
+            for i in 0..m {
+                for j in 0..n {
+                    if self[(i, j)] != other[(i, j)] {
+                        return false;
+                    }
+                }
+            }
+            true
+        }
+    }
+}
+
 impl<T: AddAssign + Clone> Add<T> for Matrix<T> {
     type Output = Self;
 
@@ -526,229 +547,337 @@ impl Sub<Matrix<isize>> for isize {
 impl Mul<Matrix<f32>> for Matrix<f32> {
     type Output = Self;
 
-    fn mul(mut self, rhs: Matrix<f32>) -> Self::Output {
+    fn mul(self, rhs: Matrix<f32>) -> Self::Output {
+        if self.size().cols() != rhs.size().rows() {
+            panic!("{}",
+                MatrixError::InvalidShape(
+                    "The inner dimensions of the two matrices must match when performing matrix multiplication".to_string()
+                )
+            );
+        }
+
         let m = self.size().rows();
         let n = self.size().cols();
         let p = rhs.size().cols();
+        let mut sums = vec![0.0; m * p];
         for i in 0..m {
             for j in 0..p {
                 let mut sum = 0.0;
                 for k in 0..n {
                     sum += self[(i, k)] * rhs[(k, j)];
                 }
-                self[(i, j)] = sum;
+                sums[p * i + j] = sum;
             }
         }
-        self
+        Self::from_vec(sums, (m, p).into()).expect("Failed to create new matrix from vector")
     }
 }
 impl Mul<Matrix<f64>> for Matrix<f64> {
     type Output = Self;
 
-    fn mul(mut self, rhs: Matrix<f64>) -> Self::Output {
+    fn mul(self, rhs: Matrix<f64>) -> Self::Output {
+        if self.size().cols() != rhs.size().rows() {
+            panic!("{}",
+                MatrixError::InvalidShape(
+                    "The inner dimensions of the two matrices must match when performing matrix multiplication".to_string()
+                )
+            );
+        }
+
         let m = self.size().rows();
         let n = self.size().cols();
         let p = rhs.size().cols();
+        let mut sums = vec![0.0; m * p];
         for i in 0..m {
             for j in 0..p {
                 let mut sum = 0.0;
                 for k in 0..n {
                     sum += self[(i, k)] * rhs[(k, j)];
                 }
-                self[(i, j)] = sum;
+                sums[p * i + j] = sum;
             }
         }
-        self
+        Self::from_vec(sums, (m, p).into()).expect("Failed to create new matrix from vector")
     }
 }
 impl Mul<Matrix<u8>> for Matrix<u8> {
     type Output = Self;
 
-    fn mul(mut self, rhs: Matrix<u8>) -> Self::Output {
+    fn mul(self, rhs: Matrix<u8>) -> Self::Output {
+        if self.size().cols() != rhs.size().rows() {
+            panic!("{}",
+                MatrixError::InvalidShape(
+                    "The inner dimensions of the two matrices must match when performing matrix multiplication".to_string()
+                )
+            );
+        }
+
         let m = self.size().rows();
         let n = self.size().cols();
         let p = rhs.size().cols();
+        let mut sums = vec![0; m * p];
         for i in 0..m {
             for j in 0..p {
                 let mut sum = 0;
                 for k in 0..n {
                     sum += self[(i, k)] * rhs[(k, j)];
                 }
-                self[(i, j)] = sum;
+                sums[p * i + j] = sum;
             }
         }
-        self
+        Self::from_vec(sums, (m, p).into()).expect("Failed to create new matrix from vector")
     }
 }
 impl Mul<Matrix<u16>> for Matrix<u16> {
     type Output = Self;
 
-    fn mul(mut self, rhs: Matrix<u16>) -> Self::Output {
+    fn mul(self, rhs: Matrix<u16>) -> Self::Output {
+        if self.size().cols() != rhs.size().rows() {
+            panic!("{}",
+                MatrixError::InvalidShape(
+                    "The inner dimensions of the two matrices must match when performing matrix multiplication".to_string()
+                )
+            );
+        }
+
         let m = self.size().rows();
         let n = self.size().cols();
         let p = rhs.size().cols();
+        let mut sums = vec![0; m * p];
         for i in 0..m {
             for j in 0..p {
                 let mut sum = 0;
                 for k in 0..n {
                     sum += self[(i, k)] * rhs[(k, j)];
                 }
-                self[(i, j)] = sum;
+                sums[p * i + j] = sum;
             }
         }
-        self
+        Self::from_vec(sums, (m, p).into()).expect("Failed to create new matrix from vector")
     }
 }
 impl Mul<Matrix<u32>> for Matrix<u32> {
     type Output = Self;
 
-    fn mul(mut self, rhs: Matrix<u32>) -> Self::Output {
+    fn mul(self, rhs: Matrix<u32>) -> Self::Output {
+        if self.size().cols() != rhs.size().rows() {
+            panic!("{}",
+                MatrixError::InvalidShape(
+                    "The inner dimensions of the two matrices must match when performing matrix multiplication".to_string()
+                )
+            );
+        }
+
         let m = self.size().rows();
         let n = self.size().cols();
         let p = rhs.size().cols();
+        let mut sums = vec![0; m * p];
         for i in 0..m {
             for j in 0..p {
                 let mut sum = 0;
                 for k in 0..n {
                     sum += self[(i, k)] * rhs[(k, j)];
                 }
-                self[(i, j)] = sum;
+                sums[p * i + j] = sum;
             }
         }
-        self
+        Self::from_vec(sums, (m, p).into()).expect("Failed to create new matrix from vector")
     }
 }
 impl Mul<Matrix<u64>> for Matrix<u64> {
     type Output = Self;
 
-    fn mul(mut self, rhs: Matrix<u64>) -> Self::Output {
+    fn mul(self, rhs: Matrix<u64>) -> Self::Output {
+        if self.size().cols() != rhs.size().rows() {
+            panic!("{}",
+                MatrixError::InvalidShape(
+                    "The inner dimensions of the two matrices must match when performing matrix multiplication".to_string()
+                )
+            );
+        }
+
         let m = self.size().rows();
         let n = self.size().cols();
         let p = rhs.size().cols();
+        let mut sums = vec![0; m * p];
         for i in 0..m {
             for j in 0..p {
                 let mut sum = 0;
                 for k in 0..n {
                     sum += self[(i, k)] * rhs[(k, j)];
                 }
-                self[(i, j)] = sum;
+                sums[p * i + j] = sum;
             }
         }
-        self
+        Self::from_vec(sums, (m, p).into()).expect("Failed to create new matrix from vector")
     }
 }
 impl Mul<Matrix<usize>> for Matrix<usize> {
     type Output = Self;
 
-    fn mul(mut self, rhs: Matrix<usize>) -> Self::Output {
+    fn mul(self, rhs: Matrix<usize>) -> Self::Output {
+        if self.size().cols() != rhs.size().rows() {
+            panic!("{}",
+                MatrixError::InvalidShape(
+                    "The inner dimensions of the two matrices must match when performing matrix multiplication".to_string()
+                )
+            );
+        }
+
         let m = self.size().rows();
         let n = self.size().cols();
         let p = rhs.size().cols();
+        let mut sums = vec![0; m * p];
         for i in 0..m {
             for j in 0..p {
                 let mut sum = 0;
                 for k in 0..n {
                     sum += self[(i, k)] * rhs[(k, j)];
                 }
-                self[(i, j)] = sum;
+                sums[p * i + j] = sum;
             }
         }
-        self
+        Self::from_vec(sums, (m, p).into()).expect("Failed to create new matrix from vector")
     }
 }
 impl Mul<Matrix<i8>> for Matrix<i8> {
     type Output = Self;
 
-    fn mul(mut self, rhs: Matrix<i8>) -> Self::Output {
+    fn mul(self, rhs: Matrix<i8>) -> Self::Output {
+        if self.size().cols() != rhs.size().rows() {
+            panic!("{}",
+                MatrixError::InvalidShape(
+                    "The inner dimensions of the two matrices must match when performing matrix multiplication".to_string()
+                )
+            );
+        }
+
         let m = self.size().rows();
         let n = self.size().cols();
         let p = rhs.size().cols();
+        let mut sums = vec![0; m * p];
         for i in 0..m {
             for j in 0..p {
                 let mut sum = 0;
                 for k in 0..n {
                     sum += self[(i, k)] * rhs[(k, j)];
                 }
-                self[(i, j)] = sum;
+                sums[p * i + j] = sum;
             }
         }
-        self
+        Self::from_vec(sums, (m, p).into()).expect("Failed to create new matrix from vector")
     }
 }
 impl Mul<Matrix<i16>> for Matrix<i16> {
     type Output = Self;
 
-    fn mul(mut self, rhs: Matrix<i16>) -> Self::Output {
+    fn mul(self, rhs: Matrix<i16>) -> Self::Output {
+        if self.size().cols() != rhs.size().rows() {
+            panic!("{}",
+                MatrixError::InvalidShape(
+                    "The inner dimensions of the two matrices must match when performing matrix multiplication".to_string()
+                )
+            );
+        }
+
         let m = self.size().rows();
         let n = self.size().cols();
         let p = rhs.size().cols();
+        let mut sums = vec![0; m * p];
         for i in 0..m {
             for j in 0..p {
                 let mut sum = 0;
                 for k in 0..n {
                     sum += self[(i, k)] * rhs[(k, j)];
                 }
-                self[(i, j)] = sum;
+                sums[p * i + j] = sum;
             }
         }
-        self
+        Self::from_vec(sums, (m, p).into()).expect("Failed to create new matrix from vector")
     }
 }
 impl Mul<Matrix<i32>> for Matrix<i32> {
     type Output = Self;
 
-    fn mul(mut self, rhs: Matrix<i32>) -> Self::Output {
+    fn mul(self, rhs: Matrix<i32>) -> Self::Output {
+        if self.size().cols() != rhs.size().rows() {
+            panic!("{}",
+                MatrixError::InvalidShape(
+                    "The inner dimensions of the two matrices must match when performing matrix multiplication".to_string()
+                )
+            );
+        }
+
         let m = self.size().rows();
         let n = self.size().cols();
         let p = rhs.size().cols();
+        let mut sums = vec![0; m * p];
         for i in 0..m {
             for j in 0..p {
                 let mut sum = 0;
                 for k in 0..n {
                     sum += self[(i, k)] * rhs[(k, j)];
                 }
-                self[(i, j)] = sum;
+                sums[p * i + j] = sum;
             }
         }
-        self
+        Self::from_vec(sums, (m, p).into()).expect("Failed to create new matrix from vector")
     }
 }
 impl Mul<Matrix<i64>> for Matrix<i64> {
     type Output = Self;
 
-    fn mul(mut self, rhs: Matrix<i64>) -> Self::Output {
+    fn mul(self, rhs: Matrix<i64>) -> Self::Output {
+        if self.size().cols() != rhs.size().rows() {
+            panic!("{}",
+                MatrixError::InvalidShape(
+                    "The inner dimensions of the two matrices must match when performing matrix multiplication".to_string()
+                )
+            );
+        }
+
         let m = self.size().rows();
         let n = self.size().cols();
         let p = rhs.size().cols();
+        let mut sums = vec![0; m * p];
         for i in 0..m {
             for j in 0..p {
                 let mut sum = 0;
                 for k in 0..n {
                     sum += self[(i, k)] * rhs[(k, j)];
                 }
-                self[(i, j)] = sum;
+                sums[p * i + j] = sum;
             }
         }
-        self
+        Self::from_vec(sums, (m, p).into()).expect("Failed to create new matrix from vector")
     }
 }
 impl Mul<Matrix<isize>> for Matrix<isize> {
     type Output = Self;
 
-    fn mul(mut self, rhs: Matrix<isize>) -> Self::Output {
+    fn mul(self, rhs: Matrix<isize>) -> Self::Output {
+        if self.size().cols() != rhs.size().rows() {
+            panic!("{}",
+                MatrixError::InvalidShape(
+                    "The inner dimensions of the two matrices must match when performing matrix multiplication".to_string()
+                )
+            );
+        }
+
         let m = self.size().rows();
         let n = self.size().cols();
         let p = rhs.size().cols();
+        let mut sums = vec![0; m * p];
         for i in 0..m {
             for j in 0..p {
                 let mut sum = 0;
                 for k in 0..n {
                     sum += self[(i, k)] * rhs[(k, j)];
                 }
-                self[(i, j)] = sum;
+                sums[p * i + j] = sum;
             }
         }
-        self
+        Self::from_vec(sums, (m, p).into()).expect("Failed to create new matrix from vector")
     }
 }
 
@@ -998,8 +1127,8 @@ mod tests {
                     assert_eq!(new_mat[(i, j)], 3.0 * mat[(i, j)]);
                 }
             }
-            dbg!(&new_mat);
-            dbg!(&mat);
+            // dbg!(&new_mat);
+            // dbg!(&mat);
         }
 
         Ok(())
@@ -1018,6 +1147,20 @@ mod tests {
             // dbg!(&new_mat);
             // dbg!(&mat);
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn can_matrix_mul() -> MatrixResult<()> {
+        let mat = Matrix::from_vec(vec![1, 2, 3, 4, 5, 6], (2, 3).into())?;
+        let mat2 = Matrix::from_vec(vec![7, 8, 9, 10, 11, 12], (3, 2).into())?;
+
+        let mul = mat * mat2;
+        assert_eq!(
+            mul,
+            Matrix::from_vec(vec![58, 64, 139, 154], (2, 2).into())?
+        );
 
         Ok(())
     }
