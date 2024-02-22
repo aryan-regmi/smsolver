@@ -523,6 +523,235 @@ impl Sub<Matrix<isize>> for isize {
     }
 }
 
+impl Mul<Matrix<f32>> for Matrix<f32> {
+    type Output = Self;
+
+    fn mul(mut self, rhs: Matrix<f32>) -> Self::Output {
+        let m = self.size().rows();
+        let n = self.size().cols();
+        let p = rhs.size().cols();
+        for i in 0..m {
+            for j in 0..p {
+                let mut sum = 0.0;
+                for k in 0..n {
+                    sum += self[(i, k)] * rhs[(k, j)];
+                }
+                self[(i, j)] = sum;
+            }
+        }
+        self
+    }
+}
+impl Mul<Matrix<f64>> for Matrix<f64> {
+    type Output = Self;
+
+    fn mul(mut self, rhs: Matrix<f64>) -> Self::Output {
+        let m = self.size().rows();
+        let n = self.size().cols();
+        let p = rhs.size().cols();
+        for i in 0..m {
+            for j in 0..p {
+                let mut sum = 0.0;
+                for k in 0..n {
+                    sum += self[(i, k)] * rhs[(k, j)];
+                }
+                self[(i, j)] = sum;
+            }
+        }
+        self
+    }
+}
+impl Mul<Matrix<u8>> for Matrix<u8> {
+    type Output = Self;
+
+    fn mul(mut self, rhs: Matrix<u8>) -> Self::Output {
+        let m = self.size().rows();
+        let n = self.size().cols();
+        let p = rhs.size().cols();
+        for i in 0..m {
+            for j in 0..p {
+                let mut sum = 0;
+                for k in 0..n {
+                    sum += self[(i, k)] * rhs[(k, j)];
+                }
+                self[(i, j)] = sum;
+            }
+        }
+        self
+    }
+}
+impl Mul<Matrix<u16>> for Matrix<u16> {
+    type Output = Self;
+
+    fn mul(mut self, rhs: Matrix<u16>) -> Self::Output {
+        let m = self.size().rows();
+        let n = self.size().cols();
+        let p = rhs.size().cols();
+        for i in 0..m {
+            for j in 0..p {
+                let mut sum = 0;
+                for k in 0..n {
+                    sum += self[(i, k)] * rhs[(k, j)];
+                }
+                self[(i, j)] = sum;
+            }
+        }
+        self
+    }
+}
+impl Mul<Matrix<u32>> for Matrix<u32> {
+    type Output = Self;
+
+    fn mul(mut self, rhs: Matrix<u32>) -> Self::Output {
+        let m = self.size().rows();
+        let n = self.size().cols();
+        let p = rhs.size().cols();
+        for i in 0..m {
+            for j in 0..p {
+                let mut sum = 0;
+                for k in 0..n {
+                    sum += self[(i, k)] * rhs[(k, j)];
+                }
+                self[(i, j)] = sum;
+            }
+        }
+        self
+    }
+}
+impl Mul<Matrix<u64>> for Matrix<u64> {
+    type Output = Self;
+
+    fn mul(mut self, rhs: Matrix<u64>) -> Self::Output {
+        let m = self.size().rows();
+        let n = self.size().cols();
+        let p = rhs.size().cols();
+        for i in 0..m {
+            for j in 0..p {
+                let mut sum = 0;
+                for k in 0..n {
+                    sum += self[(i, k)] * rhs[(k, j)];
+                }
+                self[(i, j)] = sum;
+            }
+        }
+        self
+    }
+}
+impl Mul<Matrix<usize>> for Matrix<usize> {
+    type Output = Self;
+
+    fn mul(mut self, rhs: Matrix<usize>) -> Self::Output {
+        let m = self.size().rows();
+        let n = self.size().cols();
+        let p = rhs.size().cols();
+        for i in 0..m {
+            for j in 0..p {
+                let mut sum = 0;
+                for k in 0..n {
+                    sum += self[(i, k)] * rhs[(k, j)];
+                }
+                self[(i, j)] = sum;
+            }
+        }
+        self
+    }
+}
+impl Mul<Matrix<i8>> for Matrix<i8> {
+    type Output = Self;
+
+    fn mul(mut self, rhs: Matrix<i8>) -> Self::Output {
+        let m = self.size().rows();
+        let n = self.size().cols();
+        let p = rhs.size().cols();
+        for i in 0..m {
+            for j in 0..p {
+                let mut sum = 0;
+                for k in 0..n {
+                    sum += self[(i, k)] * rhs[(k, j)];
+                }
+                self[(i, j)] = sum;
+            }
+        }
+        self
+    }
+}
+impl Mul<Matrix<i16>> for Matrix<i16> {
+    type Output = Self;
+
+    fn mul(mut self, rhs: Matrix<i16>) -> Self::Output {
+        let m = self.size().rows();
+        let n = self.size().cols();
+        let p = rhs.size().cols();
+        for i in 0..m {
+            for j in 0..p {
+                let mut sum = 0;
+                for k in 0..n {
+                    sum += self[(i, k)] * rhs[(k, j)];
+                }
+                self[(i, j)] = sum;
+            }
+        }
+        self
+    }
+}
+impl Mul<Matrix<i32>> for Matrix<i32> {
+    type Output = Self;
+
+    fn mul(mut self, rhs: Matrix<i32>) -> Self::Output {
+        let m = self.size().rows();
+        let n = self.size().cols();
+        let p = rhs.size().cols();
+        for i in 0..m {
+            for j in 0..p {
+                let mut sum = 0;
+                for k in 0..n {
+                    sum += self[(i, k)] * rhs[(k, j)];
+                }
+                self[(i, j)] = sum;
+            }
+        }
+        self
+    }
+}
+impl Mul<Matrix<i64>> for Matrix<i64> {
+    type Output = Self;
+
+    fn mul(mut self, rhs: Matrix<i64>) -> Self::Output {
+        let m = self.size().rows();
+        let n = self.size().cols();
+        let p = rhs.size().cols();
+        for i in 0..m {
+            for j in 0..p {
+                let mut sum = 0;
+                for k in 0..n {
+                    sum += self[(i, k)] * rhs[(k, j)];
+                }
+                self[(i, j)] = sum;
+            }
+        }
+        self
+    }
+}
+impl Mul<Matrix<isize>> for Matrix<isize> {
+    type Output = Self;
+
+    fn mul(mut self, rhs: Matrix<isize>) -> Self::Output {
+        let m = self.size().rows();
+        let n = self.size().cols();
+        let p = rhs.size().cols();
+        for i in 0..m {
+            for j in 0..p {
+                let mut sum = 0;
+                for k in 0..n {
+                    sum += self[(i, k)] * rhs[(k, j)];
+                }
+                self[(i, j)] = sum;
+            }
+        }
+        self
+    }
+}
+
 impl<T: MulAssign + Clone> Mul<T> for Matrix<T> {
     type Output = Self;
 
