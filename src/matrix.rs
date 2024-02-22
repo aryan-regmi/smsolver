@@ -2,7 +2,7 @@ use std::{
     alloc::{self, Layout},
     fmt,
     mem::ManuallyDrop,
-    ops::{Add, AddAssign, Index, IndexMut, Sub, SubAssign},
+    ops::{Add, AddAssign, Index, IndexMut, Mul, MulAssign, Sub, SubAssign},
     ptr::NonNull,
 };
 
@@ -523,6 +523,163 @@ impl Sub<Matrix<isize>> for isize {
     }
 }
 
+impl<T: MulAssign + Clone> Mul<T> for Matrix<T> {
+    type Output = Self;
+
+    fn mul(mut self, rhs: T) -> Self::Output {
+        for i in 0..self.size().rows() {
+            for j in 0..self.size().cols() {
+                self[(i, j)] *= rhs.clone();
+            }
+        }
+        self
+    }
+}
+impl Mul<Matrix<f32>> for f32 {
+    type Output = Matrix<f32>;
+
+    fn mul(self, mut rhs: Matrix<f32>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] *= self;
+            }
+        }
+        rhs
+    }
+}
+impl Mul<Matrix<f64>> for f64 {
+    type Output = Matrix<f64>;
+
+    fn mul(self, mut rhs: Matrix<f64>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] *= self;
+            }
+        }
+        rhs
+    }
+}
+impl Mul<Matrix<u8>> for u8 {
+    type Output = Matrix<u8>;
+
+    fn mul(self, mut rhs: Matrix<u8>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] *= self;
+            }
+        }
+        rhs
+    }
+}
+impl Mul<Matrix<u16>> for u16 {
+    type Output = Matrix<u16>;
+
+    fn mul(self, mut rhs: Matrix<u16>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] *= self;
+            }
+        }
+        rhs
+    }
+}
+impl Mul<Matrix<u32>> for u32 {
+    type Output = Matrix<u32>;
+
+    fn mul(self, mut rhs: Matrix<u32>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] *= self;
+            }
+        }
+        rhs
+    }
+}
+impl Mul<Matrix<u64>> for u64 {
+    type Output = Matrix<u64>;
+
+    fn mul(self, mut rhs: Matrix<u64>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] *= self;
+            }
+        }
+        rhs
+    }
+}
+impl Mul<Matrix<usize>> for usize {
+    type Output = Matrix<usize>;
+
+    fn mul(self, mut rhs: Matrix<usize>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] *= self;
+            }
+        }
+        rhs
+    }
+}
+impl Mul<Matrix<i8>> for i8 {
+    type Output = Matrix<i8>;
+
+    fn mul(self, mut rhs: Matrix<i8>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] *= self;
+            }
+        }
+        rhs
+    }
+}
+impl Mul<Matrix<i16>> for i16 {
+    type Output = Matrix<i16>;
+
+    fn mul(self, mut rhs: Matrix<i16>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] *= self;
+            }
+        }
+        rhs
+    }
+}
+impl Mul<Matrix<i32>> for i32 {
+    type Output = Matrix<i32>;
+
+    fn mul(self, mut rhs: Matrix<i32>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] *= self;
+            }
+        }
+        rhs
+    }
+}
+impl Mul<Matrix<i64>> for i64 {
+    type Output = Matrix<i64>;
+
+    fn mul(self, mut rhs: Matrix<i64>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] *= self;
+            }
+        }
+        rhs
+    }
+}
+impl Mul<Matrix<isize>> for isize {
+    type Output = Matrix<isize>;
+
+    fn mul(self, mut rhs: Matrix<isize>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] *= self;
+            }
+        }
+        rhs
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -584,6 +741,23 @@ mod tests {
             }
             // dbg!(&new_mat);
             // dbg!(&mat);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn can_mul() -> MatrixResult<()> {
+        let mat = Matrix::from_vec(vec![1.0, 2.0, 3.0, 4.0], (2, 2).into())?;
+        {
+            let new_mat: Matrix<f64> = 1.0 * mat.clone() * 3.0;
+            for i in 0..2 {
+                for j in 0..2 {
+                    assert_eq!(new_mat[(i, j)], 3.0 * mat[(i, j)]);
+                }
+            }
+            dbg!(&new_mat);
+            dbg!(&mat);
         }
 
         Ok(())
