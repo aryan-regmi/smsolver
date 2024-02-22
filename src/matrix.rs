@@ -6,6 +6,8 @@ use std::{
     ptr::NonNull,
 };
 
+// TODO: Add `MatrixView` that acts on &Matrix only
+
 /// Possible errors returned by matrix methods.
 #[derive(Debug, thiserror::Error)]
 pub enum MatrixError {
@@ -161,6 +163,19 @@ impl<T: Default + Clone> Matrix<T> {
     /// The created matrix will **not** have the elements zeroed, and may have random values.
     pub fn new(size: MatrixShape) -> MatrixResult<Self> {
         Self::from_vec(vec![T::default(); size.rows() * size.cols()], size)
+    }
+
+    // NOTE: Use in-place transpose algo.
+    pub fn transpose(self) -> Self {
+        let m = self.size().rows();
+        let n = self.size().cols();
+        let mut mat = Matrix::new((n, m).into()).expect("Unable to create new matrix");
+        for i in 0..m {
+            for j in 0..n {
+                mat[(j, i)] = self[(i, j)].clone();
+            }
+        }
+        mat
     }
 }
 
@@ -350,6 +365,7 @@ impl Add<Matrix<i16>> for i16 {
         rhs
     }
 }
+
 impl Add<Matrix<i32>> for i32 {
     type Output = Matrix<i32>;
 
@@ -1160,6 +1176,21 @@ mod tests {
         assert_eq!(
             mul,
             Matrix::from_vec(vec![58, 64, 139, 154], (2, 2).into())?
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn can_transpose() -> MatrixResult<()> {
+        let mat = Matrix::from_vec(vec![1, 2, 3, 4, 5, 6], (3, 2).into())?;
+        let transposed = mat.transpose();
+        // dbg!(&mat);
+        // dbg!(&transposed);
+
+        assert_eq!(
+            transposed,
+            Matrix::from_vec(vec![1, 3, 5, 2, 4, 6], (2, 3).into())?
         );
 
         Ok(())
