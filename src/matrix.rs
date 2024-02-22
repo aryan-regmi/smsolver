@@ -2,7 +2,7 @@ use std::{
     alloc::{self, Layout},
     fmt,
     mem::ManuallyDrop,
-    ops::{Add, AddAssign, Index, IndexMut},
+    ops::{Add, AddAssign, Index, IndexMut, Sub, SubAssign},
     ptr::NonNull,
 };
 
@@ -27,23 +27,26 @@ pub type MatrixResult<T> = Result<T, MatrixError>;
 
 /// Represents the dimensions of a matrix.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Dimensions(usize, usize);
+pub struct MatrixShape(usize, usize);
 
-impl Dimensions {
+impl MatrixShape {
+    /// Creates a new `Dimensions` with the specified number of rows and columns.
     pub fn new(rows: usize, cols: usize) -> Self {
         Self(rows, cols)
     }
 
+    /// Returns the number of rows.
     pub const fn rows(&self) -> usize {
         self.0
     }
 
+    /// Returns the number of columns.
     pub const fn cols(&self) -> usize {
         self.1
     }
 }
 
-impl From<(usize, usize)> for Dimensions {
+impl From<(usize, usize)> for MatrixShape {
     fn from(value: (usize, usize)) -> Self {
         Self(value.0, value.1)
     }
@@ -51,7 +54,7 @@ impl From<(usize, usize)> for Dimensions {
 
 pub struct Matrix<T> {
     buffer: NonNull<T>,
-    size: Dimensions,
+    size: MatrixShape,
 }
 
 impl<T> Index<(usize, usize)> for Matrix<T> {
@@ -99,7 +102,7 @@ impl<T> IndexMut<(usize, usize)> for Matrix<T> {
 }
 
 impl<T> Matrix<T> {
-    pub fn from_vec(v: Vec<T>, size: Dimensions) -> MatrixResult<Self> {
+    pub fn from_vec(v: Vec<T>, size: MatrixShape) -> MatrixResult<Self> {
         // Input validation
         {
             if (size.rows() == 0) || (size.cols() == 0) {
@@ -123,7 +126,7 @@ impl<T> Matrix<T> {
         Ok(Self { buffer: data, size })
     }
 
-    pub const fn size(&self) -> Dimensions {
+    pub const fn size(&self) -> MatrixShape {
         self.size
     }
 
@@ -156,7 +159,7 @@ impl<T: Default + Clone> Matrix<T> {
     /// Creates a new matrix with the specified number of rows and columns.
     ///
     /// The created matrix will **not** have the elements zeroed, and may have random values.
-    pub fn new(size: Dimensions) -> MatrixResult<Self> {
+    pub fn new(size: MatrixShape) -> MatrixResult<Self> {
         Self::from_vec(vec![T::default(); size.rows() * size.cols()], size)
     }
 }
@@ -363,6 +366,163 @@ impl Add<Matrix<isize>> for isize {
     }
 }
 
+impl<T: SubAssign + Clone> Sub<T> for Matrix<T> {
+    type Output = Self;
+
+    fn sub(mut self, rhs: T) -> Self::Output {
+        for i in 0..self.size().rows() {
+            for j in 0..self.size().cols() {
+                self[(i, j)] -= rhs.clone();
+            }
+        }
+        self
+    }
+}
+impl Sub<Matrix<f32>> for f32 {
+    type Output = Matrix<f32>;
+
+    fn sub(self, mut rhs: Matrix<f32>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] = self - rhs[(i, j)];
+            }
+        }
+        rhs
+    }
+}
+impl Sub<Matrix<f64>> for f64 {
+    type Output = Matrix<f64>;
+
+    fn sub(self, mut rhs: Matrix<f64>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] = self - rhs[(i, j)];
+            }
+        }
+        rhs
+    }
+}
+impl Sub<Matrix<u8>> for u8 {
+    type Output = Matrix<u8>;
+
+    fn sub(self, mut rhs: Matrix<u8>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] = self - rhs[(i, j)];
+            }
+        }
+        rhs
+    }
+}
+impl Sub<Matrix<u16>> for u16 {
+    type Output = Matrix<u16>;
+
+    fn sub(self, mut rhs: Matrix<u16>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] = self - rhs[(i, j)];
+            }
+        }
+        rhs
+    }
+}
+impl Sub<Matrix<u32>> for u32 {
+    type Output = Matrix<u32>;
+
+    fn sub(self, mut rhs: Matrix<u32>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] = self - rhs[(i, j)];
+            }
+        }
+        rhs
+    }
+}
+impl Sub<Matrix<u64>> for u64 {
+    type Output = Matrix<u64>;
+
+    fn sub(self, mut rhs: Matrix<u64>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] = self - rhs[(i, j)];
+            }
+        }
+        rhs
+    }
+}
+impl Sub<Matrix<usize>> for usize {
+    type Output = Matrix<usize>;
+
+    fn sub(self, mut rhs: Matrix<usize>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] = self - rhs[(i, j)];
+            }
+        }
+        rhs
+    }
+}
+impl Sub<Matrix<i8>> for i8 {
+    type Output = Matrix<i8>;
+
+    fn sub(self, mut rhs: Matrix<i8>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] = self - rhs[(i, j)];
+            }
+        }
+        rhs
+    }
+}
+impl Sub<Matrix<i16>> for i16 {
+    type Output = Matrix<i16>;
+
+    fn sub(self, mut rhs: Matrix<i16>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] = self - rhs[(i, j)];
+            }
+        }
+        rhs
+    }
+}
+impl Sub<Matrix<i32>> for i32 {
+    type Output = Matrix<i32>;
+
+    fn sub(self, mut rhs: Matrix<i32>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] = self - rhs[(i, j)];
+            }
+        }
+        rhs
+    }
+}
+impl Sub<Matrix<i64>> for i64 {
+    type Output = Matrix<i64>;
+
+    fn sub(self, mut rhs: Matrix<i64>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] = self - rhs[(i, j)];
+            }
+        }
+        rhs
+    }
+}
+impl Sub<Matrix<isize>> for isize {
+    type Output = Matrix<isize>;
+
+    fn sub(self, mut rhs: Matrix<isize>) -> Self::Output {
+        for i in 0..rhs.size().rows() {
+            for j in 0..rhs.size().cols() {
+                rhs[(i, j)] = self - rhs[(i, j)];
+            }
+        }
+        rhs
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -371,11 +531,11 @@ mod tests {
     #[test]
     fn can_init() -> MatrixResult<()> {
         let mat: Matrix<f32> = Matrix::new((2, 2).into())?;
-        assert_eq!(mat.size(), Dimensions::new(2, 2));
+        assert_eq!(mat.size(), MatrixShape::new(2, 2));
         // dbg!(&mat);
 
         let mat = Matrix::linspace::<5>(1.0, 5.0);
-        assert_eq!(mat.size(), Dimensions::new(1, 5));
+        assert_eq!(mat.size(), MatrixShape::new(1, 5));
         let v = vec![1., 2., 3., 4., 5.];
         for j in 0..5 {
             assert_eq!(mat[(0, j)], v[j]);
@@ -384,7 +544,7 @@ mod tests {
 
         let v = vec![1, 2, 3, 4, 5, 6];
         let mat = Matrix::from_vec(v.clone(), (2, 3).into())?;
-        assert_eq!(mat.size(), Dimensions::new(2, 3));
+        assert_eq!(mat.size(), MatrixShape::new(2, 3));
         for i in 0..mat.size().rows() {
             for j in 0..mat.size().cols() {
                 assert_eq!(mat[(i, j)], v[mat.size().cols() * i + j]);
@@ -403,6 +563,23 @@ mod tests {
             for i in 0..2 {
                 for j in 0..2 {
                     assert_eq!(new_mat[(i, j)], 4.0 + mat[(i, j)]);
+                }
+            }
+            // dbg!(&new_mat);
+            // dbg!(&mat);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn can_sub() -> MatrixResult<()> {
+        let mat = Matrix::from_vec(vec![1.0, 2.0, 3.0, 4.0], (2, 2).into())?;
+        {
+            let new_mat: Matrix<f64> = 1.0 - mat.clone() - 3.0;
+            for i in 0..2 {
+                for j in 0..2 {
+                    assert_eq!(new_mat[(i, j)], -1.0 * mat[(i, j)] - 2.0);
                 }
             }
             // dbg!(&new_mat);
