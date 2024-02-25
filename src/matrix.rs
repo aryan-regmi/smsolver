@@ -168,7 +168,7 @@ impl<T: Default + Clone> Matrix<T> {
         Self::from_vec(vec![T::default(); size.rows() * size.cols()], size)
     }
 
-    // NOTE: Use in-place transpose algo.
+    // FIXME: Use in-place transpose algo.
     pub fn transpose(self) -> Self {
         let m = self.size().rows();
         let n = self.size().cols();
